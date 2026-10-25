@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip) and 5 (notepad stack) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack) and 6 (stats) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -57,24 +57,27 @@ src/
     ui/gesture.ts           # direction locking + GestureArbiter: a swipe flips or peels, never both
     ui/peel.ts              # pure peel maths: dead zone, progress, commit, momentum guard, neighbours(), skippedBetween()
     ui/peelGesture.ts       # touch/pointer/wheel controller that turns a pull at the end of a list into a peel
-    ui/history.ts           # LayerHistory: one browser-history entry per layer (past pages now; Stats/Settings later)
+    ui/history.ts           # LayerHistory: one browser-history entry per layer (`past`, `stats`; Settings later); close() resolves after the popstate
+    ui/sheet.ts, ui/views.ts   # slideUp transition (crossfade on reduced motion); context key App uses to offer openStats
     ui/page-memory.ts       # what a page remembers while off screen (side, scroll), and the PageNav type
     ui/inert.ts, ui/portal.ts   # `inert` attribute action; move an element to <body>
     ui/flip.ts              # pure flip maths (angles, swipe rules, easing) and shouldAutoFlip
     ui/busy.svelte.ts       # lock held during drag/edit/menu so the page cannot flip
     ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
     store/backup.ts         # JSON export/import (Phase 7)
-    stats/compute.ts        # pure stats functions
+    stats/compute.ts        # pure stats: dailyCounts, streaks, summary, routineStats, weekdayAverages, heatmap, skippedBefore
+    stats/scale.ts          # niceTicks(max): rounded axis ticks
   components/
     NotepadStack.svelte     # the stack of day pages: peel, Today, goTo(key), history, rollover
     DayPage.svelte          # one day: FlipCard + flip button + auto-flip; owns the page's `side`
     FlipCard.svelte         # two-sided 3D card: flip animation and swipe gesture
     Face.svelte             # one side of the page: date header + the scrolling, ruled body
     TodoSide.svelte, DoneSide.svelte, TaskItem.svelte, TaskInput.svelte, TaskMenu.svelte, Toast.svelte
-    StatsView.svelte, charts/BarChart.svelte, charts/Heatmap.svelte
+    StatsView.svelte        # the stats sheet (graph paper) over the notepad
+    charts/BarChart.svelte, charts/Heatmap.svelte
     SettingsSheet.svelte
   styles/tokens.css, paper.css
-  App.svelte                # view switch: Notepad | Stats | Settings
+  App.svelte                # owns the shared LayerHistory and stats-open state: Notepad + Stats sheet (+ Settings later)
 ```
 
 ## Data model
@@ -135,6 +138,23 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - The flip button (turned corner, bottom right) has `aria-label` "Show done list" / "Show to-do list", `aria-pressed` and shows the other side's count; the count bumps when it changes.
 - Header on every face: date line (with Stats and Settings) and a caption line (side · how long ago · lock) with the page buttons. Long dates shrink with `clamp()`.
 - Colours, spacing and shadows come from `tokens.css`, with light (paper) and dark themes.
+
+## Stats
+
+Everything is computed from `AppData`, `today` and the week start by pure functions in `stats/compute.ts`.
+
+- **Done task:** `doneAt` set, counted on its page's date. **Active day:** a day with a saved page; a **missed day** has none.
+- **Streak:** consecutive calendar days with at least one task done. It ends today or yesterday (a day still in progress does not break it); a missed day or a day with nothing done ends it.
+- **Routine completion %:** done instances / instances that existed (only days where the routine was added), matched by `routineId` so renames keep history. Stopped routines with nothing in range are left out; the rest fold under "Stopped (n)". The 14-day strip is done / missed / none (no page, or routine not added).
+- **Day completion rate:** done / all tasks on the page. **Average:** done per active day. **Change:** against the previous period of the same length, null when that period has no done tasks.
+- **Today is included in every figure as it stands.** Ranges never reach past today.
+- **Week start:** `weekStart(locale)` in `dates.ts` reads `Intl.Locale#getWeekInfo()` (or the older `weekInfo`), returns 0–6 (0 = Sunday) and falls back to Monday. `StatsView` reads it once when it opens; heatmap rows and weekday bars start there.
+- **Heatmap levels:** 0 = nothing done. Days (in the drawn grid, up to today) with something done are split into quarters by nearest-rank quartiles (`cuts`); with fewer than 8 such days, fixed cuts: 1, 2–3, 4–5, 6+. 53 weeks are drawn and the scroller opens on the current week. "N days skipped before" counts page-less days directly before that date.
+- **Colours:** `--viz-1`…`--viz-4` (sequential blue in the ink colour), `--viz-empty`, `--viz-today`, `--viz-grid` in `tokens.css`, for light and dark. Colour is never the only signal: tap labels give exact numbers.
+- **Sheet:** the Stats button (every page header) opens `StatsView` over the notepad (`slideUp`, ~350 ms; 150 ms crossfade on reduced motion). It is a `stats` layer in the shared `LayerHistory` (App owns it and passes it to `NotepadStack`), so Back, ×, Escape or a swipe down close it; from a past page the layers are `past` then `stats`. The notepad is `inert` while it is open and focus moves to the sheet's heading.
+- **Chart → page:** "Open page" (or Enter) calls `openDay(key)` in `App`: close the `stats` layer (awaiting its popstate), then `NotepadStack.goTo(key)`, which opens the `past` layer, so Back goes from there to today.
+- **Accessibility:** each chart is `<svg role="img">` with a summary label plus a visually hidden table (wrapped in a `div.sr-only`: a bare `table.sr-only` still stretches the scroller); tiles are a `<dl>`; the range switch is a radio group; the heatmap is a roving-tabindex grid (arrows move, Enter opens) and the bar chart takes arrow keys too.
+- `.row` is a global class in `paper.css`; chart markup must not reuse it.
 
 ## Today page interactions
 

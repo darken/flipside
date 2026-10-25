@@ -117,3 +117,40 @@ export async function touchDrag(
     { from, to, ms, steps },
   );
 }
+
+/**
+ * Seeds `count` days of history before today (2026-10-25) for the stats view: a page on most days
+ * (every fifth day is missed), a varying number of tasks and one routine.
+ */
+export async function seedHistory(page: Page, count = 120) {
+  const days: Record<string, unknown> = {};
+  for (let offset = 0; offset < count; offset++) {
+    if (offset > 0 && offset % 5 === 4) continue; // a missed day
+    const key = keyOffset(offset);
+    const total = 3 + ((offset * 7) % 6);
+    const done = offset === 0 ? 2 : (offset * 3) % (total + 1);
+    const tasks = Array.from({ length: total }, (_, i) => ({
+      id: `${key}-${i}`,
+      text: `Task ${i + 1} of ${key}`,
+      createdAt: `${key}T08:${String(i).padStart(2, '0')}:00.000Z`,
+      order: i,
+      ...(i < done && { doneAt: `${key}T12:${String(i).padStart(2, '0')}:00.000Z` }),
+    }));
+    tasks.push({
+      id: `${key}-routine`,
+      text: 'Stretch',
+      createdAt: `${key}T08:30:00.000Z`,
+      order: 99,
+      routineId: 'r1',
+      ...(offset % 3 !== 0 && { doneAt: `${key}T09:00:00.000Z` }),
+    } as (typeof tasks)[number]);
+    days[key] = { date: key, tasks };
+  }
+  const routines = [{ id: 'r1', text: 'Stretch', active: true, createdAt: '2026-01-01T00:00:00Z' }];
+  await page.addInitScript(
+    (json) => {
+      if (!localStorage.getItem('flipside:v1')) localStorage.setItem('flipside:v1', json);
+    },
+    JSON.stringify({ version: 1, routines, days }),
+  );
+}

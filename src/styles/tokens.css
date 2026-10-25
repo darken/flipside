@@ -14,6 +14,15 @@
   --accent: #2f3e5c;
   --noise-opacity: 0.35;
 
+  /* Charts: a sequential blue in the ink colour, from a light wash to full ink */
+  --viz-1: #c3cfe8;
+  --viz-2: #93a7d3;
+  --viz-3: #5d79b6;
+  --viz-4: #2f3e5c;
+  --viz-empty: #e6dcc0;
+  --viz-today: #d4574e;
+  --viz-grid: rgb(47 62 92 / 0.14);
+
   /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
@@ -59,6 +68,13 @@
   --desk: #121217;
   --accent: #c9d6f2;
   --noise-opacity: 0.18;
+  --viz-1: #3a4a73;
+  --viz-2: #5871ad;
+  --viz-3: #8aa3dc;
+  --viz-4: #c9d6f2;
+  --viz-empty: #34323d;
+  --viz-today: #e8938b;
+  --viz-grid: rgb(201 214 242 / 0.14);
   --shadow-paper: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.5);
   --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 16px 40px rgb(0 0 0 / 0.6);
 }
@@ -77,6 +93,13 @@
     --desk: #121217;
     --accent: #c9d6f2;
     --noise-opacity: 0.18;
+    --viz-1: #3a4a73;
+    --viz-2: #5871ad;
+    --viz-3: #8aa3dc;
+    --viz-4: #c9d6f2;
+    --viz-empty: #34323d;
+    --viz-today: #e8938b;
+    --viz-grid: rgb(201 214 242 / 0.14);
     --shadow-paper: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.5);
     --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 16px 40px rgb(0 0 0 / 0.6);
   }

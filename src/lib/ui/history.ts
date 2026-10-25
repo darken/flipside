@@ -18,6 +18,8 @@ export class LayerHistory {
   #layers: Layer[] = [];
   /** Popstates caused by our own `history.back()`, which must not close anything. */
   #ignore = 0;
+  /** Callers waiting for the popstate of one of our own `history.back()` calls. */
+  #waiting: (() => void)[] = [];
   #host: HistoryHost;
   #listener = () => this.#popstate();
 
@@ -54,22 +56,25 @@ export class LayerHistory {
 
   /**
    * Closes a layer from the app's own code (not the Back button) and removes its entry. Only the
-   * top layer's entry can be removed; a deeper one is just forgotten.
+   * top layer's entry can be removed; a deeper one is just forgotten. The promise resolves once
+   * the browser has finished going back, so a new layer can be opened without racing it.
    */
-  close(id: string): void {
+  close(id: string): Promise<void> {
     const index = this.#layers.findIndex((l) => l.id === id);
-    if (index < 0) return;
+    if (index < 0) return Promise.resolve();
     const wasTop = index === this.#layers.length - 1;
     this.#layers.splice(index, 1);
-    if (wasTop) {
-      this.#ignore++;
-      this.#host.history.back();
-    }
+    if (!wasTop) return Promise.resolve();
+    this.#ignore++;
+    const done = new Promise<void>((resolve) => this.#waiting.push(resolve));
+    this.#host.history.back();
+    return done;
   }
 
   #popstate() {
     if (this.#ignore > 0) {
       this.#ignore--;
+      this.#waiting.shift()?.();
       return;
     }
     const layer = this.#layers.pop();

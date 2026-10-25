@@ -4,6 +4,12 @@ import {
   compareKeys,
   daysBetween,
   formatHeading,
+  formatShort,
+  formatWithWeekday,
+  startOfWeek,
+  weekday,
+  weekdayName,
+  weekStart,
   formatRelative,
   formatTime,
   isPast,
@@ -203,5 +209,69 @@ describe('formatRelative', () => {
   it('uses calendar days across a month and a leap day', () => {
     expect(formatRelative('2026-09-30', '2026-10-02')).toBe('2 days ago');
     expect(formatRelative('2024-02-28', '2024-03-01')).toBe('2 days ago');
+  });
+});
+
+describe('weekStart', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is Monday for a Monday locale and Sunday for en-US', () => {
+    expect(weekStart('de-DE')).toBe(1);
+    expect(weekStart('en-US')).toBe(0);
+    expect(weekStart('ar-EG')).toBe(6);
+  });
+
+  it('works with only the older weekInfo property', () => {
+    class OldLocale {
+      weekInfo = { firstDay: 7 };
+    }
+    vi.stubGlobal('Intl', { ...Intl, Locale: OldLocale });
+    expect(weekStart('en-US')).toBe(0);
+  });
+
+  it('prefers getWeekInfo() when both exist', () => {
+    class NewLocale {
+      weekInfo = { firstDay: 7 };
+      getWeekInfo() {
+        return { firstDay: 3 };
+      }
+    }
+    vi.stubGlobal('Intl', { ...Intl, Locale: NewLocale });
+    expect(weekStart('x')).toBe(3);
+  });
+
+  it('falls back to Monday when neither is available, or the locale is unusable', () => {
+    class BareLocale {}
+    vi.stubGlobal('Intl', { ...Intl, Locale: BareLocale });
+    expect(weekStart('en-US')).toBe(1);
+    vi.unstubAllGlobals();
+    expect(weekStart('not a locale!!')).toBe(1);
+  });
+});
+
+describe('startOfWeek and weekday', () => {
+  it('finds the first day of the week for either week start', () => {
+    // 2026-10-25 is a Sunday.
+    expect(weekday('2026-10-25')).toBe(0);
+    expect(startOfWeek('2026-10-25', 0)).toBe('2026-10-25');
+    expect(startOfWeek('2026-10-25', 1)).toBe('2026-10-19');
+    expect(startOfWeek('2026-10-21', 1)).toBe('2026-10-19');
+    expect(startOfWeek('2026-10-21', 0)).toBe('2026-10-18');
+  });
+
+  it('crosses month, year and daylight-saving boundaries', () => {
+    expect(startOfWeek('2026-01-01', 1)).toBe('2025-12-29');
+    expect(startOfWeek('2026-11-02', 0)).toBe('2026-11-01'); // clocks went back that morning
+    expect(startOfWeek('2026-03-09', 1)).toBe('2026-03-09');
+    expect(startOfWeek('2026-03-10', 0)).toBe('2026-03-08'); // clocks went forward that morning
+  });
+});
+
+describe('short formats', () => {
+  it('formats days for chart labels', () => {
+    expect(formatShort('2026-10-22', 'en-US')).toBe('Oct 22');
+    expect(formatWithWeekday('2026-10-22', 'en-US')).toBe('Thu, Oct 22');
+    expect(weekdayName(1, 'en-US')).toBe('Mon');
+    expect(weekdayName(0, 'en-US', 'narrow')).toBe('S');
   });
 });

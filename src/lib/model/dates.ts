@@ -96,3 +96,58 @@ export function formatRelative(key: DateKey, today: DateKey): string {
   if (days < 365) return plural(Math.floor(days / 30), 'month');
   return plural(Math.floor(days / 365), 'year');
 }
+
+/** Day of the week for a key: 0 = Sunday … 6 = Saturday. */
+export function weekday(key: DateKey): number {
+  return parseKey(key).getDay();
+}
+
+type WeekInfoLocale = Intl.Locale & {
+  getWeekInfo?: () => { firstDay: number };
+  weekInfo?: { firstDay: number };
+};
+
+/**
+ * First day of the week for a locale as 0–6 (0 = Sunday), read from `Intl.Locale`'s
+ * `getWeekInfo()` or the older `weekInfo` property. Monday (1) when neither is available.
+ */
+export function weekStart(locale?: string): number {
+  try {
+    const tag = locale ?? (typeof navigator !== 'undefined' ? navigator.language : undefined);
+    const info = new Intl.Locale(tag as string) as WeekInfoLocale;
+    const first = (typeof info.getWeekInfo === 'function' ? info.getWeekInfo() : info.weekInfo)
+      ?.firstDay;
+    // Intl numbers days 1 (Monday) to 7 (Sunday).
+    if (typeof first === 'number' && first >= 1 && first <= 7) return first % 7;
+  } catch {
+    // Unknown or missing locale: fall through to Monday.
+  }
+  return 1;
+}
+
+/** The first day of the week containing `key`, for a week that starts on `weekStart` (0–6). */
+export function startOfWeek(key: DateKey, weekStart: number): DateKey {
+  return addDays(key, -((weekday(key) - weekStart + 7) % 7));
+}
+
+/** "Oct 22" */
+export function formatShort(key: DateKey, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(parseKey(key));
+}
+
+/** "Wed, Oct 22" */
+export function formatWithWeekday(key: DateKey, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(parseKey(key));
+}
+
+/** "Wed", "Mon", … for a weekday number 0–6. */
+export function weekdayName(day: number, locale?: string, width: 'short' | 'narrow' = 'short') {
+  // 2023-01-01 was a Sunday.
+  return new Intl.DateTimeFormat(locale, { weekday: width }).format(
+    parseKey(addDays('2023-01-01', day)),
+  );
+}

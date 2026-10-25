@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { getContext, type Snippet } from 'svelte';
   import { formatHeading, formatRelative } from '$lib/model/dates';
   import type { DateKey } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import type { PageNav } from '$lib/ui/page-memory';
   import { skippedLabel } from '$lib/ui/peel';
+  import { OPEN_STATS } from '$lib/ui/views';
 
   type Props = {
     key: DateKey;
@@ -20,6 +21,8 @@
   };
   let { key, caption, readOnly, nav, skipped, scrollTop, onScroll, children }: Props = $props();
 
+  const openStats = getContext<(() => void) | undefined>(OPEN_STATS);
+
   const relative = $derived(key === app.today ? '' : formatRelative(key, app.today));
 
   function restoreScroll(node: HTMLElement) {
@@ -32,7 +35,7 @@
     <div class="line">
       <h1 class="date" tabindex="-1">{formatHeading(key)}</h1>
       <nav class="views" aria-label="Views">
-        <button type="button" class="icon-btn" aria-label="Stats">
+        <button type="button" class="icon-btn" aria-label="Stats" onclick={() => openStats?.()}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7" /></svg>
         </button>
         <button type="button" class="icon-btn" aria-label="Settings">

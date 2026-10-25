@@ -156,4 +156,14 @@ describe('LayerHistory after a reload', () => {
     expect(window.history.state).toEqual({ flipside: 'past' });
     stop();
   });
+
+  it('resolves close() once the browser has gone back', async () => {
+    const host = fakeHost();
+    const layers = new LayerHistory(host);
+    layers.init();
+    layers.open('stats', vi.fn());
+    await expect(layers.close('stats')).resolves.toBeUndefined();
+    await expect(layers.close('stats')).resolves.toBeUndefined(); // already closed
+    expect(host.index()).toBe(0);
+  });
 });

@@ -29,7 +29,11 @@
   import DayPage from './DayPage.svelte';
 
   const PAST_LAYER = 'past';
-  const history = new LayerHistory();
+
+  /** `App` shares one LayerHistory so Stats and past pages stack; alone, the stack makes its own. */
+  let { history: shared }: { history?: LayerHistory } = $props();
+  const ownsHistory = untrack(() => !shared);
+  const history = untrack(() => shared ?? new LayerHistory());
 
   let currentKey = $state<DateKey>(untrack(() => app.today));
   let announcement = $state('');
@@ -366,7 +370,7 @@
   // ---- Gestures and keys --------------------------------------------------------------------
 
   onMount(() => {
-    const stopHistory = history.init();
+    const stopHistory = ownsHistory ? history.init() : () => {};
     const stopGestures = attachPeelGestures({
       target: stack!,
       getScroller: () =>
