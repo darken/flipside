@@ -9,8 +9,6 @@ export const FLING_PX_PER_MS = 0.5;
 export const EDGE_PX = 20;
 /** Pause after the last task is checked off before the page turns over. */
 export const AUTO_FLIP_DELAY_MS = 400;
-/** Phase 7 turns this into a setting ("Auto-flip when done"). */
-export const AUTO_FLIP_ENABLED = true;
 
 export const MAX_TILT_DEG = 4;
 export const MIN_SCALE = 0.96;
@@ -128,13 +126,14 @@ export type AutoFlipContext = {
   busy: boolean;
   /** The page has already turned by itself once. */
   alreadyFlipped: boolean;
-  enabled?: boolean;
+  /** The "Auto-flip when done" setting. */
+  enabled: boolean;
 };
 
 /** True when finishing the last open task should turn the page over to the done list. */
 export function shouldAutoFlip(before: number, after: number, context: AutoFlipContext): boolean {
   return (
-    (context.enabled ?? AUTO_FLIP_ENABLED) &&
+    context.enabled &&
     context.cause === 'check' &&
     before === 1 &&
     after === 0 &&

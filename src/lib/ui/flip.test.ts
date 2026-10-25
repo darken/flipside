@@ -155,6 +155,7 @@ describe('shouldAutoFlip', () => {
     side: 'todo',
     busy: false,
     alreadyFlipped: false,
+    enabled: true,
   };
 
   it('turns the page when the last open task is checked off', () => {

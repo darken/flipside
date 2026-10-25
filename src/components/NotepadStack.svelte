@@ -349,6 +349,23 @@
     await goToday();
   }
 
+  // ---- Whole notebook replaced (import, undo) or the open page vanished (another tab) ---------
+
+  let knownEpoch = untrack(() => app.epoch);
+  $effect(() => {
+    const epoch = app.epoch;
+    untrack(() => {
+      if (epoch === knownEpoch) return;
+      knownEpoch = epoch;
+      memories.clear();
+      void land(app.today, false);
+    });
+  });
+  $effect(() => {
+    if (keys.includes(currentKey)) return;
+    untrack(() => void land(app.today, false));
+  });
+
   // ---- A new day while the app is open ------------------------------------------------------
 
   let knownToday = untrack(() => app.today);

@@ -16,7 +16,7 @@
 <style>
   .toasts {
     position: fixed;
-    z-index: 20;
+    z-index: 40;
     left: 0;
     right: 0;
     bottom: calc(var(--space-4) + env(safe-area-inset-bottom));

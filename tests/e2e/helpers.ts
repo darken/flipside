@@ -122,7 +122,7 @@ export async function touchDrag(
  * Seeds `count` days of history before today (2026-10-25) for the stats view: a page on most days
  * (every fifth day is missed), a varying number of tasks and one routine.
  */
-export async function seedHistory(page: Page, count = 120) {
+export function historyJson(count = 120): string {
   const days: Record<string, unknown> = {};
   for (let offset = 0; offset < count; offset++) {
     if (offset > 0 && offset % 5 === 4) continue; // a missed day
@@ -147,10 +147,11 @@ export async function seedHistory(page: Page, count = 120) {
     days[key] = { date: key, tasks };
   }
   const routines = [{ id: 'r1', text: 'Stretch', active: true, createdAt: '2026-01-01T00:00:00Z' }];
-  await page.addInitScript(
-    (json) => {
-      if (!localStorage.getItem('flipside:v1')) localStorage.setItem('flipside:v1', json);
-    },
-    JSON.stringify({ version: 1, routines, days }),
-  );
+  return JSON.stringify({ version: 1, routines, days });
+}
+
+export async function seedHistory(page: Page, count = 120) {
+  await page.addInitScript((json) => {
+    if (!localStorage.getItem('flipside:v1')) localStorage.setItem('flipside:v1', json);
+  }, historyJson(count));
 }

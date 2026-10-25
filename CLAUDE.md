@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack), 6 (stats) and 9 (deploy: Vercel at https://flipside-self.vercel.app, GitHub Actions CI) are done. Build the remaining phases (7, then 8) in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack), 6 (stats), 7 (backup and settings) and 9 (deploy: Vercel at https://flipside-self.vercel.app, GitHub Actions CI) are done. Build the remaining phase (8) in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -57,14 +57,16 @@ src/
     ui/gesture.ts           # direction locking + GestureArbiter: a swipe flips or peels, never both
     ui/peel.ts              # pure peel maths: dead zone, progress, commit, momentum guard, neighbours(), skippedBetween()
     ui/peelGesture.ts       # touch/pointer/wheel controller that turns a pull at the end of a list into a peel
-    ui/history.ts           # LayerHistory: one browser-history entry per layer (`past`, `stats`; Settings later); close() resolves after the popstate
-    ui/sheet.ts, ui/views.ts   # slideUp transition (crossfade on reduced motion); context key App uses to offer openStats
+    ui/history.ts           # LayerHistory: one browser-history entry per layer (`past`, `stats`, `settings`); close() resolves after the popstate
+    ui/sheet.ts, ui/views.ts   # slideUp transition (crossfade on reduced motion); context keys App uses to offer openStats / openSettings
+    ui/sheets.svelte.ts, ui/nudge.svelte.ts, ui/pwa.svelte.ts, ui/reload.ts   # open sheet; reminder note state; "update available"; reloadApp()
     ui/page-memory.ts       # what a page remembers while off screen (side, scroll), and the PageNav type
     ui/inert.ts, ui/portal.ts   # `inert` attribute action; move an element to <body>
     ui/flip.ts              # pure flip maths (angles, swipe rules, easing) and shouldAutoFlip
     ui/busy.svelte.ts       # lock held during drag/edit/menu so the page cannot flip
     ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
-    store/backup.ts         # JSON export/import (Phase 7)
+    store/backup.ts         # makeBackup/readBackup/previewBackup, exportBackup (share sheet or download), backupNudge
+    settings/settings.svelte.ts   # `settings` ($state, own localStorage key, cross-tab sync); types.ts (shape, parseSettings); theme.ts (applyTheme)
     stats/compute.ts        # pure stats: dailyCounts, streaks, summary, routineStats, weekdayAverages, heatmap, skippedBefore
     stats/scale.ts          # niceTicks(max): rounded axis ticks
   components/
@@ -75,9 +77,12 @@ src/
     TodoSide.svelte, DoneSide.svelte, TaskItem.svelte, TaskInput.svelte, TaskMenu.svelte, Toast.svelte
     StatsView.svelte        # the stats sheet (graph paper) over the notepad
     charts/BarChart.svelte, charts/Heatmap.svelte
-    SettingsSheet.svelte
+    Sheet.svelte            # shared slide-up sheet: header, ×, Escape, swipe down, focus, scroll area (graph or lined)
+    SettingsSheet.svelte    # theme, auto-flip, backup/import/erase, storage info, about
+    BackupNudge.svelte      # the reminder note under the date header on today's page
+    Segmented.svelte        # radio-group pill switch (range, theme)
   styles/tokens.css, paper.css
-  App.svelte                # owns the shared LayerHistory and stats-open state: Notepad + Stats sheet (+ Settings later)
+  App.svelte                # owns the shared LayerHistory and the open sheet (`sheets`): Notepad + Stats / Settings sheet
 ```
 
 ## Data model
@@ -112,7 +117,14 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - Corrupt data is copied to `flipside:v1:corrupt-<timestamp>` and the app starts empty. A failed save sets `app.storageOk = false`; the app keeps working in memory. Another tab's save is picked up through the `storage` event.
 - **Day rollover:** `app.tick()` runs every minute and on `visibilitychange`, and before every mutation, so the new day opens with its routine tasks and yesterday turns read-only.
 - Any change to the shape of `AppData` bumps `version` and adds a migration in `persist.ts`.
-- Export downloads `flipside-backup-YYYY-MM-DD.json`. Import validates the file's structure and version, shows a preview, and asks for confirmation before replacing data.
+- **Settings** live under their own key, `flipside:settings:v1`: `{ version: 1, theme: 'system' | 'light' | 'dark', autoFlip: boolean, lastBackupAt?, backupNudgeShownAt? }` (the two stamps belong to this device). `settings` (`settings.svelte.ts`) loads defaults for anything missing or invalid, saves straight away, syncs between tabs through the `storage` event, and `main.ts` calls `settings.init()`. `AppData` and its version are untouched. Week start stays automatic (locale, Monday fallback): there is no setting for it.
+- **Theme:** `applyTheme()` sets `data-theme` on `<html>` (removed for "system") and the `<meta name="theme-color">` tags (restored for "system"); changes crossfade colours for 200 ms via `html.theme-fade` (instant with reduced motion). An inline script in `index.html` reads `flipside:settings:v1` and sets both before the first paint, in try/catch: keep it in step with `applyTheme` and `THEME_COLORS`.
+- **Backup file** (`store/backup.ts`): `{ "app": "flipside", "backupVersion": 1, "exportedAt", "data": AppData, "settings": { version, theme, autoFlip } }`, without the device-only stamps. `readBackup` rejects files over 10 MB, checks the marker, runs `migrate()` and `parseAppData()` (an invalid `settings` part is ignored; a bare `AppData` object is accepted) and gives "Not a Flipside backup", "This backup is from a newer version of Flipside" or "The file is damaged". Filename `flipside-backup-YYYY-MM-DD.json` (local date).
+- **Download:** `exportBackup()` uses `navigator.share({ files })` where `canShare({ files })` allows it (phones), else an `<a download>`. Closing the share sheet (`AbortError`) records nothing; a finished backup sets `lastBackupAt`.
+- **Import replaces everything** (no merge): file picker → preview next to the current figures → confirm → `app.replaceAll(data)`: copies the current data to `flipside:v1:before-import-<timestamp>` (only the latest is kept), cancels a pending save, swaps the data (past days are not read-only here), makes sure today has its routines, saves at once (other tabs follow via `storage`) and bumps `app.epoch` so the notepad returns to today. The backup's theme and auto-flip are applied. A toast "Backup imported · Undo" (10 s) calls `app.restoreSafetyCopy(key)` and restores the previous settings.
+- **Keeping data safe:** the first `app.add()` calls `navigator.storage.persist()` once. Settings shows the data size, `navigator.storage.estimate()`, "Protected from automatic clearing" when granted, and in a normal Safari tab (not installed) "Add Flipside to your Home Screen…" because Safari may delete site data after 7 days without a visit. `storageOk = false` shows "Changes aren't being saved on this device".
+- **Backup reminder:** `backupNudge(settings, data, now)` is due with at least 7 days of pages and either `lastBackupAt` 30+ days ago, or no backup ever and a first page 30+ days old. Settings turns the "Last backup" line into "No backup for N days · Download now" while due. On today's page `BackupNudge` shows once per app start at most once every 30 days (`backupNudgeShownAt`), until dismissed or backed up; never on past pages or while a sheet or the task menu is open. "Back up" opens Settings at "Your data".
+- **Erase all data** (Settings, "Danger zone"): sheet 1 offers "Download a backup first" or "Erase everything", step 2 needs `erase` typed. It removes every `flipside:*` key (data, settings, corrupt and safety copies), then reloads; no undo.
 
 ## UI and animation
 
@@ -121,7 +133,7 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - **Flip (`FlipCard`):** `perspective: 1400px` on the stage, `transform-style: preserve-3d` on the card, two faces in one grid cell, the back at `rotateY(180deg)`, `backface-visibility: hidden` with the `-webkit-` prefix and `translateZ(0)` on each face. Both faces stay mounted; the hidden one gets `inert` (set as an attribute) and `aria-hidden`. **Never put `overflow: hidden` (or any non-`visible` overflow) on the stage, the card or anything above them, and not on `.paper`: it flattens the 3D context and breaks the flip on iOS Safari.** `will-change: transform` is set only while a flip runs.
 - **Flip motion:** Web Animations API on `transform` and `opacity` only, so it can be cancelled or reversed part way. About 600 ms, `cubic-bezier(0.2, 0.7, 0.2, 1)` (sampled into keyframes by `flip.ts`), around the vertical centre line, with scale 0.96 and a 4° `rotateX` tilt at the midpoint, a shade overlay on each face and a glow layer for the shadow. The button always turns the page right to left; a swipe turns it the way the finger goes. When it finishes, focus moves to the new face's `h1` and an `aria-live` region says "Done list, 5 tasks".
 - **Swipe to flip:** touch and pen only (mouse users have the button and the **F** key; F is ignored while typing or when a modifier is held). After about 10 px the gesture locks to horizontal or vertical; vertical is left to the face's scrolling (`touch-action: pan-y` on the stage, the faces and the scrollers). The angle follows the finger (`dx / width × 180°`); on release it finishes past 90° or on a fling faster than 0.5 px/ms in the drag's direction, otherwise it springs back. A swipe does not start in a text field, on a drag handle, within 20 px of a screen edge, or while `busy` is held (drag, edit, open menu). Swipes during a running flip are ignored; the button and F reverse it.
-- **Auto-flip:** checking off the last open task on today's page (todo 1 → 0) turns the page to the done side after 400 ms, once per page, and shows the "All done ✓" stamp. It never happens after deleting or copying, on past pages, while something holds `busy`, or when already on the back (`shouldAutoFlip` in `flip.ts`). `AUTO_FLIP_ENABLED` becomes the "Auto-flip when done" setting in Phase 7.
+- **Auto-flip:** checking off the last open task on today's page (todo 1 → 0) turns the page to the done side after 400 ms, once per page, and shows the "All done ✓" stamp. It never happens after deleting or copying, on past pages, while something holds `busy`, or when already on the back (`shouldAutoFlip` in `flip.ts`). It is the "Auto-flip when done" setting (`settings.autoFlip`, passed to `shouldAutoFlip` as `enabled`).
 - **Side state:** `DayPage` keeps its `side` in memory only; every page opens on the to-do side, and a new day starts on the front.
 - **Dialogs and fixed elements inside a face are trapped** by the transformed ancestor (`position: fixed` is then relative to the card). `TaskMenu` therefore moves itself to `<body>` with the `portal` action.
 - **Day stack (`NotepadStack`):** a custom peel gesture, not scroll-snap. Pulling past the end of the visible list lifts the current page up and away (`translateY` to -100%, `rotateX` up to 12° from the top edge, a growing shadow) to reveal the older page, which scales 0.96 → 1 as its dark overlay fades; pulling down at the top brings the newer page back down. About 450 ms with the flip's curve. Only `transform` and `opacity` animate; `will-change` is set only during a peel.
@@ -130,7 +142,7 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - **One gesture at a time:** `gestures` (`gesture.ts`) lets a swipe either flip (horizontal) or peel (vertical); whoever locks first owns it. A running flip or peel, and anything holding `busy`, blocks the other.
 - **Other ways to turn:** "‹ Newer" / "Older ›" buttons in each page header (also for screen readers), Alt+↓ (older) / Alt+↑ (newer), and a wheel or trackpad event of about 120 px at the end of a list after a 200 ms pause (one page per burst). The Today button (past pages only) animates back through at most 5 newer pages, ~100 ms each; any more are skipped instantly. `goTo(key)` (exported by `NotepadStack`) jumps to a day, or the nearest day that has a page. **Phase 6:** heatmap cells call `goTo`. **Phase 8 (optional):** a calendar sheet from the date header.
 - **Past pages:** read-only (`editable=false`), softer ink (`--ink-past`), a lock icon, "Yesterday" / "3 days ago" in the header, and "Copy to today" on unfinished one-off tasks. Missed days have no page and are skipped; the page below a gap shows "2 days skipped" at the top of its list.
-- **Back button (`LayerHistory`):** one history entry per layer, however many pages you peel; Back closes the top layer. Peeling away from today opens the `past` layer; Back on a past page animates to today; Today or peeling back to today removes the entry with `history.back()`; Back on today leaves the app. A reload opens on today and clears any leftover entry. Stats (Phase 6), Settings (Phase 7) and the task menu can be added as further layers.
+- **Back button (`LayerHistory`):** one history entry per layer, however many pages you peel; Back closes the top layer. Peeling away from today opens the `past` layer; Back on a past page animates to today; Today or peeling back to today removes the entry with `history.back()`; Back on today leaves the app. A reload opens on today and clears any leftover entry. `stats` and `settings` are further layers (one sheet at a time, opened from `App`); the task menu could be one too.
 - **New day while open:** on today, the new day lays down on top, the old today becomes the read-only page below, and a toast says "It's a new day". On a past page nothing moves; Today and Back lead to the new day.
 - **After a peel:** focus moves to the new page's date heading and an `aria-live` message reads "Friday, October 24 · Yesterday · read-only" (plus "2 days skipped").
 - Animate only `transform` and `opacity`. Aim for 60 fps on mid-range phones.
@@ -151,9 +163,10 @@ Everything is computed from `AppData`, `today` and the week start by pure functi
 - **Week start:** `weekStart(locale)` in `dates.ts` reads `Intl.Locale#getWeekInfo()` (or the older `weekInfo`), returns 0–6 (0 = Sunday) and falls back to Monday. `StatsView` reads it once when it opens; heatmap rows and weekday bars start there.
 - **Heatmap levels:** 0 = nothing done. Days (in the drawn grid, up to today) with something done are split into quarters by nearest-rank quartiles (`cuts`); with fewer than 8 such days, fixed cuts: 1, 2–3, 4–5, 6+. 53 weeks are drawn and the scroller opens on the current week. "N days skipped before" counts page-less days directly before that date.
 - **Colours:** `--viz-1`…`--viz-4` (sequential blue in the ink colour), `--viz-empty`, `--viz-today`, `--viz-grid` in `tokens.css`, for light and dark. Colour is never the only signal: tap labels give exact numbers.
-- **Sheet:** the Stats button (every page header) opens `StatsView` over the notepad (`slideUp`, ~350 ms; 150 ms crossfade on reduced motion). It is a `stats` layer in the shared `LayerHistory` (App owns it and passes it to `NotepadStack`), so Back, ×, Escape or a swipe down close it; from a past page the layers are `past` then `stats`. The notepad is `inert` while it is open and focus moves to the sheet's heading.
+- **Sheet:** the Stats and Settings buttons (every page header) open `StatsView` / `SettingsSheet`, both built on the shared `Sheet.svelte` (graph paper or lined card, ×, Escape, swipe down, focus on the heading), over the notepad (`slideUp`, ~350 ms; 150 ms crossfade on reduced motion). It is a `stats` (or `settings`) layer in the shared `LayerHistory` (App owns it and passes it to `NotepadStack`), so Back, ×, Escape or a swipe down close it; from a past page the layers are `past` then `stats`. The notepad is `inert` while it is open and focus moves to the sheet's heading.
 - **Chart → page:** "Open page" (or Enter) calls `openDay(key)` in `App`: close the `stats` layer (awaiting its popstate), then `NotepadStack.goTo(key)`, which opens the `past` layer, so Back goes from there to today.
 - **Accessibility:** each chart is `<svg role="img">` with a summary label plus a visually hidden table (wrapped in a `div.sr-only`: a bare `table.sr-only` still stretches the scroller); tiles are a `<dl>`; the range switch is a radio group; the heatmap is a roving-tabindex grid (arrows move, Enter opens) and the bar chart takes arrow keys too.
+- PWA updates: `registerType: 'prompt'` (`workbox-window` is a dev dependency bundled by Vite); `main.ts` registers the service worker and a waiting version shows as "Update available · Reload" in Settings. `__APP_VERSION__` / `__BUILD_DATE__` come from `vite.config.ts`. Danger colours are `--danger` / `--on-danger` in `tokens.css`.
 - `.row` is a global class in `paper.css`; chart markup must not reuse it.
 
 ## Today page interactions
@@ -188,6 +201,6 @@ Components take a date `key` and an `editable` flag (`app.isEditable(key)`), so 
 4. Flip animation
 5. Notepad stack: scroll peel, browsing earlier days
 6. Stats: 30-day bars, streaks, routine completion %, heatmap
-7. Backup and settings: export, import, theme
+7. Backup and settings: export, import, theme (done)
 8. Polish and QA: real-device iOS Safari and Android Chrome, Lighthouse
 9. Deploy as a static site, with CI running tests and the build

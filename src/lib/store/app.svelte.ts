@@ -20,8 +20,12 @@ import {
   STORAGE_KEY,
   browserStorage,
   createSaver,
+  eraseAll,
   load,
+  loadSafetyCopy,
+  requestPersistence,
   save,
+  saveSafetyCopy,
   type LoadResult,
   type Saver,
   type StorageLike,
@@ -44,6 +48,8 @@ export class AppStore {
   /** False once a save has failed; the app keeps working from memory. */
   storageOk = $state(true);
   loadStatus = $state<LoadResult['status']>('empty');
+  /** Counts whole-data replacements (import, undo), so the notepad can go back to today. */
+  epoch = $state(0);
 
   todayDay = $derived<Day>(this.data.days[this.today] ?? { date: this.today, tasks: [] });
   /** Every day that has a page, newest first. */
@@ -53,6 +59,7 @@ export class AppStore {
   #saver: Saver | null = null;
   #now: () => Date;
   #options: AppStoreOptions;
+  #askedPersistence = false;
 
   constructor(options: AppStoreOptions = {}) {
     this.#options = options;
@@ -118,6 +125,7 @@ export class AppStore {
     if (normalizeText(text) === null) return null;
     const { day, task } = addTask(getDay(this.data, key), text, this.#now());
     this.#commit(putDay(this.data, day));
+    this.#askForPersistence();
     return task;
   }
 
@@ -181,6 +189,56 @@ export class AppStore {
     const result = copyToToday(this.data, fromKey, id, this.today, this.#now());
     this.#commit(result.data);
     return result.task;
+  }
+
+  /**
+   * Replaces everything with imported data. Past days are not read-only here: the whole notebook
+   * is swapped. The current data is first copied to a safety key, whose name is returned (null if
+   * that copy could not be written) so the import can be undone with `restoreSafetyCopy`.
+   */
+  replaceAll(data: AppData): string | null {
+    this.tick();
+    const safety = saveSafetyCopy(
+      $state.snapshot(this.data) as AppData,
+      this.#storage,
+      this.#now(),
+    );
+    this.#replace(data);
+    return safety;
+  }
+
+  /** Undo for `replaceAll`: puts the safety copy back. False when it is gone. */
+  restoreSafetyCopy(key: string): boolean {
+    const data = loadSafetyCopy(key, this.#storage);
+    if (!data) return false;
+    this.#replace(data);
+    try {
+      this.#storage?.removeItem(key);
+    } catch {
+      // The leftover copy is harmless.
+    }
+    return true;
+  }
+
+  /** Deletes everything this app stored. The caller reloads afterwards. */
+  eraseEverything(): void {
+    this.#saver?.cancel();
+    eraseAll(this.#storage);
+  }
+
+  #replace(data: AppData): void {
+    this.#saver?.cancel();
+    const next = ensureDay(data, this.today, this.#now());
+    this.data = next;
+    this.storageOk = save($state.snapshot(this.data) as AppData, this.#storage);
+    this.epoch++;
+  }
+
+  /** The first time something is written, ask the browser not to clear our data. */
+  #askForPersistence(): void {
+    if (this.#askedPersistence) return;
+    this.#askedPersistence = true;
+    void requestPersistence();
   }
 
   /** Checks for a date change first, so a page left open past midnight is already read-only. */

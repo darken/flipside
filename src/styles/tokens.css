@@ -22,6 +22,8 @@
   --viz-empty: #e6dcc0;
   --viz-today: #d4574e;
   --viz-grid: rgb(47 62 92 / 0.14);
+  --danger: #b3261e;
+  --on-danger: #fff;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -75,6 +77,8 @@
   --viz-empty: #34323d;
   --viz-today: #e8938b;
   --viz-grid: rgb(201 214 242 / 0.14);
+  --danger: #f2a29c;
+  --on-danger: #2b1210;
   --shadow-paper: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.5);
   --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 16px 40px rgb(0 0 0 / 0.6);
 }
@@ -100,6 +104,8 @@
     --viz-empty: #34323d;
     --viz-today: #e8938b;
     --viz-grid: rgb(201 214 242 / 0.14);
+    --danger: #f2a29c;
+    --on-danger: #2b1210;
     --shadow-paper: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px rgb(0 0 0 / 0.5);
     --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.5), 0 16px 40px rgb(0 0 0 / 0.6);
   }

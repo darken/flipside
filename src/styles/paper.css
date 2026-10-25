@@ -129,6 +129,19 @@ p {
   outline-offset: 2px;
 }
 
+/* Switching theme: colours crossfade for a moment (the one place that is not transform/opacity) */
+:root.theme-fade,
+:root.theme-fade *,
+:root.theme-fade *::before,
+:root.theme-fade *::after {
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease,
+    fill 200ms ease,
+    stroke 200ms ease !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -136,6 +149,7 @@ p {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }

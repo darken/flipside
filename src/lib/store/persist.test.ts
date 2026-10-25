@@ -3,11 +3,15 @@ import { MemoryStorage } from '../../../tests/memory-storage';
 import { emptyData } from '$lib/model/types';
 import {
   STORAGE_KEY,
+  appKeys,
   browserStorage,
   createSaver,
+  isSafariTab,
   load,
   migrate,
+  requestPersistence,
   save,
+  storageInfo,
   type StorageLike,
 } from './persist';
 
@@ -193,5 +197,73 @@ describe('createSaver', () => {
     saver.schedule();
     window.dispatchEvent(new Event('pagehide'));
     expect(write).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('storage helpers', () => {
+  afterEach(() => {
+    delete (navigator as { storage?: unknown }).storage;
+  });
+
+  it('lists only this app’s keys', () => {
+    const s = new MemoryStorage();
+    s.setItem('flipside:v1', '1');
+    s.setItem('flipside:settings:v1', '2');
+    s.setItem('other', '3');
+    expect(appKeys(s).sort()).toEqual(['flipside:settings:v1', 'flipside:v1']);
+    expect(appKeys(null)).toEqual([]);
+  });
+
+  it('measures the data and reads the browser estimate', async () => {
+    const s = new MemoryStorage();
+    s.setItem('flipside:v1', 'x'.repeat(50));
+    Object.defineProperty(navigator, 'storage', {
+      value: { estimate: async () => ({ usage: 10, quota: 100 }), persisted: async () => true },
+      configurable: true,
+    });
+    expect(await storageInfo(s)).toEqual({
+      dataBytes: 100,
+      usage: 10,
+      quota: 100,
+      persisted: true,
+    });
+  });
+
+  it('reports unknowns when the browser has no storage manager', async () => {
+    expect(await storageInfo(null)).toEqual({
+      dataBytes: 0,
+      usage: null,
+      quota: null,
+      persisted: null,
+    });
+  });
+
+  it('requests persistence only where it exists, and reuses an existing grant', async () => {
+    expect(await requestPersistence()).toBe(false);
+    const persist = vi.fn(async () => true);
+    Object.defineProperty(navigator, 'storage', {
+      value: { persist, persisted: async () => true },
+      configurable: true,
+    });
+    expect(await requestPersistence()).toBe(true);
+    expect(persist).not.toHaveBeenCalled();
+    Object.defineProperty(navigator, 'storage', {
+      value: { persist: async () => false, persisted: async () => false },
+      configurable: true,
+    });
+    expect(await requestPersistence()).toBe(false);
+  });
+
+  it('knows a Safari tab from an installed app and other browsers', () => {
+    const ua = (value: string) => vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(value);
+    ua(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1',
+    );
+    expect(isSafariTab()).toBe(true);
+    (navigator as { standalone?: boolean }).standalone = true;
+    expect(isSafariTab()).toBe(false);
+    delete (navigator as { standalone?: boolean }).standalone;
+    ua('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36');
+    expect(isSafariTab()).toBe(false);
   });
 });

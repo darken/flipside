@@ -5,7 +5,7 @@
   import { app } from '$lib/store/app.svelte';
   import type { PageNav } from '$lib/ui/page-memory';
   import { skippedLabel } from '$lib/ui/peel';
-  import { OPEN_STATS } from '$lib/ui/views';
+  import { OPEN_SETTINGS, OPEN_STATS } from '$lib/ui/views';
 
   type Props = {
     key: DateKey;
@@ -22,6 +22,7 @@
   let { key, caption, readOnly, nav, skipped, scrollTop, onScroll, children }: Props = $props();
 
   const openStats = getContext<(() => void) | undefined>(OPEN_STATS);
+  const openSettings = getContext<(() => void) | undefined>(OPEN_SETTINGS);
 
   const relative = $derived(key === app.today ? '' : formatRelative(key, app.today));
 
@@ -38,7 +39,12 @@
         <button type="button" class="icon-btn" aria-label="Stats" onclick={() => openStats?.()}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7" /></svg>
         </button>
-        <button type="button" class="icon-btn" aria-label="Settings">
+        <button
+          type="button"
+          class="icon-btn"
+          aria-label="Settings"
+          onclick={() => openSettings?.()}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="12" cy="12" r="3" /><path
               d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"

@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { doneTasks, todoTasks } from '$lib/model/tasks';
   import type { DateKey } from '$lib/model/types';
+  import { settings } from '$lib/settings/settings.svelte';
   import { app } from '$lib/store/app.svelte';
   import { busy } from '$lib/ui/busy.svelte';
   import { AUTO_FLIP_DELAY_MS, shouldAutoFlip, type Side } from '$lib/ui/flip';
@@ -58,6 +59,7 @@
       side,
       busy: busy.active,
       alreadyFlipped: autoFlipped,
+      enabled: settings.autoFlip,
     });
     if (!shouldAutoFlip(before, after, context())) return;
     clearTimeout(autoFlipTimer);

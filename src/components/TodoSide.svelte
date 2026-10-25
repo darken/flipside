@@ -8,6 +8,7 @@
   import { guarded } from '$lib/ui/guarded';
   import { motion, setLeaving, taskFade } from '$lib/ui/motion';
   import { toasts } from '$lib/ui/toast.svelte';
+  import BackupNudge from './BackupNudge.svelte';
   import TaskInput from './TaskInput.svelte';
   import TaskItem from './TaskItem.svelte';
   import TaskMenu from './TaskMenu.svelte';
@@ -228,6 +229,9 @@
 </script>
 
 <section class="side" aria-label="To do">
+  {#if editable && key === app.today && !menu}
+    <BackupNudge />
+  {/if}
   {#if todo.length === 0}
     <p class="note">
       {day.tasks.length === 0 ? 'A fresh page. What’s first?' : 'Everything’s done. Anything else?'}

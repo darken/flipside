@@ -101,7 +101,7 @@ test('the heatmap opens on the current week and scrolls sideways without moving 
   const state = () =>
     page.evaluate(() => {
       const s = document.querySelector('.heatmap .scroller') as HTMLElement;
-      const sheet = document.querySelector('.stats-host .scroll') as HTMLElement;
+      const sheet = document.querySelector('.sheet-host .scroll') as HTMLElement;
       return {
         left: s.scrollLeft,
         max: s.scrollWidth - s.clientWidth,
@@ -150,7 +150,7 @@ for (const scheme of ['light', 'dark'] as const) {
       return {
         paper: css.getPropertyValue('--paper-cream').trim(),
         viz4: css.getPropertyValue('--viz-4').trim(),
-        sheet: getComputedStyle(document.querySelector('.stats-host .sheet')!).backgroundColor,
+        sheet: getComputedStyle(document.querySelector('.sheet-host .sheet')!).backgroundColor,
       };
     });
     expect(colours.viz4).toBe(scheme === 'light' ? '#2f3e5c' : '#c9d6f2');
@@ -159,7 +159,7 @@ for (const scheme of ['light', 'dark'] as const) {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     expect(overflow).toBeLessThanOrEqual(0);
 
-    const scroll = page.locator('.stats-host .scroll');
+    const scroll = page.locator('.sheet-host .scroll');
     await page.screenshot({ path: testInfo.outputPath(`stats-${scheme}-top.png`) });
     await testInfo.attach(`stats-${scheme}-top`, {
       path: testInfo.outputPath(`stats-${scheme}-top.png`),

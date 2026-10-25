@@ -17,6 +17,22 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Flipside" />
     <title>Flipside</title>
+    <script>
+      // Applies the saved theme before the first paint, so there is no flash of the wrong one.
+      try {
+        var saved = JSON.parse(localStorage.getItem('flipside:settings:v1') || 'null');
+        var theme = saved && saved.theme;
+        if (theme === 'light' || theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', theme);
+          var color = theme === 'dark' ? '#1c1b22' : '#f6efdc';
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          for (var i = 0; i < metas.length; i++) {
+            metas[i].removeAttribute('media');
+            metas[i].setAttribute('content', color);
+          }
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

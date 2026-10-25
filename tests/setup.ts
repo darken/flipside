@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
 import { afterEach, beforeEach, vi } from 'vitest';
+import { settings } from '$lib/settings/settings.svelte';
+import { nudge } from '$lib/ui/nudge.svelte';
+import { sheets } from '$lib/ui/sheets.svelte';
 import { MemoryStorage } from './memory-storage';
 
 // jsdom has no Web Animations API; Svelte's transitions look for it when elements leave.
@@ -25,6 +28,12 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // Module-level UI state must not leak from one test into the next.
+  sheets.open = null;
+  sheets.section = null;
+  nudge.dismiss();
+  settings.reset();
+  document.documentElement.removeAttribute('data-theme');
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });

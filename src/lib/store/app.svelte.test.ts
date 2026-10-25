@@ -452,3 +452,149 @@ describe('dispose', () => {
     expect(store.today).toBe(T1);
   });
 });
+
+describe('replaceAll', () => {
+  const imported = (date: string) =>
+    ({
+      version: 1,
+      routines: [
+        { id: 'r1', text: 'Stretch', active: true, createdAt: '2026-09-01T00:00:00.000Z' },
+      ],
+      days: {
+        [date]: {
+          date,
+          tasks: [{ id: 'old', text: 'old task', createdAt: `${date}T08:00:00.000Z`, order: 0 }],
+        },
+      },
+    }) as const;
+
+  it('replaces everything, past days included, and saves straight away', () => {
+    const store = open();
+    store.add(T1, 'mine');
+    store.replaceAll(structuredClone(imported('2026-09-01')) as never);
+    expect(Object.keys(store.data.days).sort()).toEqual(['2026-09-01', T1]);
+    // No debounce: the new data is already in storage.
+    const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
+    expect(Object.keys(saved.days).sort()).toEqual(['2026-09-01', T1]);
+  });
+
+  it('cancels a pending save, so the old data is not written over the import', () => {
+    const store = open();
+    store.add(T1, 'unsaved');
+    store.replaceAll(structuredClone(imported('2026-09-01')) as never);
+    vi.advanceTimersByTime(1000);
+    const saved = JSON.parse(storage.getItem(STORAGE_KEY)!);
+    expect(JSON.stringify(saved)).not.toContain('unsaved');
+  });
+
+  it("gives today's page its routine tasks", () => {
+    const store = open();
+    store.replaceAll(structuredClone(imported('2026-09-01')) as never);
+    expect(texts(store, T1)).toEqual(['Stretch']);
+    expect(store.data.days[T1]!.tasks[0]!.routineId).toBe('r1');
+  });
+
+  it('bumps the epoch so the notepad goes back to today', () => {
+    const store = open();
+    const before = store.epoch;
+    store.replaceAll(structuredClone(imported('2026-09-01')) as never);
+    expect(store.epoch).toBe(before + 1);
+  });
+
+  it('keeps the previous data in a safety copy, and only the latest one', () => {
+    const store = open();
+    store.add(T1, 'first');
+    const key1 = store.replaceAll(structuredClone(imported('2026-09-01')) as never)!;
+    expect(key1).toMatch(/^flipside:v1:before-import-\d+$/);
+    expect(storage.getItem(key1)).toContain('first');
+
+    clock = new Date(2026, 9, 25, 12, 5, 0);
+    vi.setSystemTime(clock);
+    const key2 = store.replaceAll(structuredClone(imported('2026-08-01')) as never)!;
+    expect(key2).not.toBe(key1);
+    expect(storage.getItem(key1)).toBeNull();
+    expect(storage.getItem(key2)).toContain('old task');
+  });
+
+  it('undo puts the safety copy back and removes it', () => {
+    const store = open();
+    store.add(T1, 'precious');
+    const key = store.replaceAll(structuredClone(imported('2026-09-01')) as never)!;
+    expect(texts(store, T1)).not.toContain('precious');
+    expect(store.restoreSafetyCopy(key)).toBe(true);
+    expect(texts(store, T1)).toContain('precious');
+    expect(storage.getItem(key)).toBeNull();
+    expect(JSON.stringify(JSON.parse(storage.getItem(STORAGE_KEY)!))).toContain('precious');
+  });
+
+  it('undo reports failure when the safety copy is gone or unreadable', () => {
+    const store = open();
+    expect(store.restoreSafetyCopy('flipside:v1:before-import-1')).toBe(false);
+    storage.setItem('flipside:v1:before-import-2', '{broken');
+    expect(store.restoreSafetyCopy('flipside:v1:before-import-2')).toBe(false);
+  });
+
+  it('still replaces when the safety copy cannot be written', () => {
+    const store = open();
+    const realSet = storage.setItem.bind(storage);
+    storage.setItem = (key: string, value: string) => {
+      if (key.includes('before-import')) throw new Error('full');
+      realSet(key, value);
+    };
+    expect(store.replaceAll(structuredClone(imported('2026-09-01')) as never)).toBeNull();
+    expect(store.data.days['2026-09-01']).toBeDefined();
+  });
+
+  it('works without storage and reports that nothing is saved', () => {
+    const store = new AppStore({ now: () => new Date(clock), storage: null });
+    disposers.push(store.init());
+    expect(store.replaceAll(structuredClone(imported('2026-09-01')) as never)).toBeNull();
+    expect(store.storageOk).toBe(false);
+  });
+
+  it('is picked up by another tab through the storage event', () => {
+    const a = open();
+    const b = open();
+    a.replaceAll(structuredClone(imported('2026-09-01')) as never);
+    window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
+    expect(b.data.days['2026-09-01']).toBeDefined();
+  });
+});
+
+describe('eraseEverything', () => {
+  it('removes data, settings and every safety or corrupt copy, and nothing else', () => {
+    const store = open();
+    store.add(T1, 'bye');
+    vi.advanceTimersByTime(1000);
+    storage.setItem('flipside:settings:v1', '{}');
+    storage.setItem('flipside:v1:before-import-5', '{}');
+    storage.setItem('flipside:v1:corrupt-5', 'x');
+    storage.setItem('other-app', 'keep');
+    store.eraseEverything();
+    expect(storage.length).toBe(1);
+    expect(storage.getItem('other-app')).toBe('keep');
+    // Nothing writes it back afterwards.
+    vi.advanceTimersByTime(1000);
+    expect(storage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('asking for persistent storage', () => {
+  afterEach(() => {
+    delete (navigator as { storage?: unknown }).storage;
+  });
+
+  it('asks once, after the first task is added', async () => {
+    const persist = vi.fn(async () => true);
+    Object.defineProperty(navigator, 'storage', {
+      value: { persist, persisted: async () => false },
+      configurable: true,
+    });
+    const store = open();
+    expect(persist).not.toHaveBeenCalled();
+    store.add(T1, 'one');
+    store.add(T1, 'two');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(persist).toHaveBeenCalledTimes(1);
+  });
+});
