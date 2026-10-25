@@ -1,0 +1,102 @@
+/* Base reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--desk);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: var(--line-height);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+/* Paper sheet: ruled lines, margin line, binding strip, soft shadow, noise */
+.paper {
+  --binding-height: 28px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--paper-cream);
+  background-image:
+    linear-gradient(
+      to right,
+      transparent calc(var(--margin-x) - 1px),
+      var(--margin-line) calc(var(--margin-x) - 1px),
+      var(--margin-line) calc(var(--margin-x) + 1px),
+      transparent calc(var(--margin-x) + 1px)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--line-height) - 1px),
+      var(--ruled-line) calc(var(--line-height) - 1px),
+      var(--ruled-line) var(--line-height)
+    );
+  background-position:
+    0 0,
+    0 var(--binding-height);
+  box-shadow: var(--shadow-paper);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+/* Paper grain, drawn by an inlined feTurbulence filter (well under 20 KB) */
+.paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0 0.2 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+:root[data-theme='dark'] .paper::before {
+  mix-blend-mode: screen;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .paper::before {
+    mix-blend-mode: screen;
+  }
+}
+
+/* Binding strip along the top edge */
+.paper::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--binding-height);
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, var(--paper-edge) 0 4px, transparent 5px) 0 50% / 36px 100%
+      repeat-x,
+    linear-gradient(to bottom, var(--binding), color-mix(in srgb, var(--binding) 80%, transparent));
+  box-shadow: 0 2px 4px rgb(0 0 0 / 0.2);
+}

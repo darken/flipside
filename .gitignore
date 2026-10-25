@@ -1,0 +1,26 @@
+node_modules
+dist
+dev-dev
+dev-dist
+.vite
+*.local
+.env
+.env.*
+!.env.example
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Other package managers
+package-lock.json
+yarn.lock
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.tsbuildinfo
