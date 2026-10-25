@@ -110,7 +110,7 @@
     try {
       text = await readText(file);
     } catch {
-      importError = 'The file could not be read';
+      importError = 'Couldn’t read that file';
       return;
     }
     const result = readBackup(text);
@@ -135,7 +135,7 @@
     if (imported) settings.update({ theme: imported.theme, autoFlip: imported.autoFlip });
     pending = null;
     onclose();
-    toasts.show(key ? 'Backup imported' : 'Backup imported (it cannot be undone)', {
+    toasts.show(key ? 'Backup imported' : 'Backup imported (it can’t be undone)', {
       duration: 10_000,
       ...(key && {
         action: {
@@ -145,7 +145,7 @@
               settings.update({ theme: before.theme, autoFlip: before.autoFlip });
               toasts.show('Import undone');
             } else {
-              toasts.show('Could not undo: the saved copy is gone');
+              toasts.show('Couldn’t undo: the saved copy is gone');
             }
           },
         },

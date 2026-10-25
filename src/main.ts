@@ -16,8 +16,10 @@ import { app } from '$lib/store/app.svelte';
 import { installGlobalHandlers } from '$lib/ui/crash';
 import { pwa } from '$lib/ui/pwa.svelte';
 import { applyUpdate } from '$lib/ui/reload';
+import { watchKeyboard } from '$lib/ui/viewport';
 
 installGlobalHandlers();
+watchKeyboard();
 // Dev server only: `?seed=365` fills the app with sample data. The branch is dropped from builds.
 if (import.meta.env.DEV) {
   const { seedFromLocation } = await import('$lib/dev/seed');

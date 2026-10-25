@@ -34,6 +34,13 @@ describe('seedData', () => {
     expect(total).toBeLessThan(14000);
   });
 
+  it('never repeats a task on one page', () => {
+    for (const day of Object.values(seedData({ days: 200, today: TODAY }).days)) {
+      const texts = day.tasks.map((t) => t.text);
+      expect(new Set(texts).size).toBe(texts.length);
+    }
+  });
+
   it('puts today half done with open tasks', () => {
     const today = seedData({ days: 30, today: TODAY }).days[TODAY]!;
     expect(today.tasks.some((t) => t.doneAt)).toBe(true);

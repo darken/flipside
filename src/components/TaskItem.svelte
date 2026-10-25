@@ -316,7 +316,7 @@
     color: var(--ink);
     font: inherit;
     line-height: var(--line-height);
-    text-align: left;
+    text-align: start;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     user-select: none;

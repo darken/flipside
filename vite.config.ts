@@ -65,6 +65,21 @@ function preloadHeadingFont(): Plugin {
   };
 }
 
+/** `pnpm analyze`: writes dist/stats.html, a map of what is in each chunk (not part of normal builds). */
+async function analyzer(): Promise<Plugin[]> {
+  if (!process.env.ANALYZE) return [];
+  const { visualizer } = await import('rollup-plugin-visualizer');
+  return [
+    visualizer({
+      filename: 'stats.html',
+      template: 'treemap',
+      gzipSize: true,
+    }) as unknown as Plugin,
+  ];
+}
+
+const analyze = await analyzer();
+
 export default defineConfig({
   resolve: { alias },
   define: {
@@ -77,6 +92,7 @@ export default defineConfig({
     svelte(),
     svelteTesting(),
     preloadHeadingFont(),
+    ...analyze,
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['apple-touch-icon-180x180.png', 'favicon.ico', 'icon.svg'],
@@ -129,8 +145,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,webmanifest}'],
-        // Install-prompt pictures are only fetched by the browser at install time.
-        globIgnores: ['screenshots/**'],
+        // Install-prompt pictures and iOS launch screens are only fetched by the system when needed.
+        globIgnores: ['screenshots/**', 'apple-splash-*.png'],
         navigateFallback: 'index.html',
         // The first visit is covered at once (so "Reload" in Settings works without a reload first).
         // Later versions still wait in the background until the person asks for them.

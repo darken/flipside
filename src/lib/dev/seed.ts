@@ -59,7 +59,6 @@ export type SeedOptions = {
 
 export function seedData({ days: count, today = todayKey(), seed = 1 }: SeedOptions): AppData {
   const rand = random(seed);
-  const pick = <T>(list: readonly T[]) => list[Math.floor(rand() * list.length)]!;
 
   const routines: Routine[] = ROUTINES.map((text, i) => ({
     id: `routine-${i + 1}`,
@@ -97,10 +96,13 @@ export function seedData({ days: count, today = todayKey(), seed = 1 }: SeedOpti
     });
 
     const oneOffs = 3 + Math.floor(rand() * 7) + (isToday ? 3 : 0);
+    // A different handful each day, never the same task twice on one page.
+    const pool = [...ONE_OFFS];
     for (let i = 0; i < oneOffs; i++) {
+      const text = pool.splice(Math.floor(rand() * pool.length), 1)[0]!;
       // Past days finished about three quarters of what they had; today is half way through.
       const finished = isToday ? i % 2 === 0 : rand() < 0.75;
-      add(pick(ONE_OFFS), finished ? { doneAt: at(key, 9 + Math.floor(rand() * 9), i * 7) } : {});
+      add(text, finished ? { doneAt: at(key, 9 + Math.floor(rand() * 9), i * 7) } : {});
     }
     result[key] = { date: key, tasks };
   }
