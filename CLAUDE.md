@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack) and 6 (stats) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack), 6 (stats) and 9 (deploy: Vercel at https://flipside-self.vercel.app, GitHub Actions CI) are done. Build the remaining phases (7, then 8) in the order below, and update this file when commands or structure change.
 
 ## Stack
 
