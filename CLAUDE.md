@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack), 6 (stats), 7 (backup and settings) and 9 (deploy: Vercel at https://flipside-self.vercel.app, GitHub Actions CI) are done. Build the remaining phase (8) in the order below, and update this file when commands or structure change.
+> Status: all phases are built: 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip), 5 (notepad stack), 6 (stats), 7 (backup and settings), 8 (polish and QA: the code, checks and docs; the real-device run of `docs/qa-checklist.md` is still to be done before tagging `v1.0.0`) and 9 (deploy: Vercel at https://flipside-self.vercel.app, GitHub Actions CI). Update this file when commands or structure change.
 
 ## Stack
 
@@ -26,10 +26,14 @@ pnpm preview       # serve the build
 pnpm check         # svelte-check + tsc (node configs)
 pnpm lint          # ESLint + Prettier --check
 pnpm format        # Prettier --write
-pnpm icons         # regenerate PWA icons from public/icon.svg
+pnpm icons         # regenerate PWA icons and the iOS launch screens (public/apple-splash-*) from public/icon.svg; paste new <link> lines into index.html if the device list changes
 pnpm test          # Vitest (TZ fixed to America/New_York)
 pnpm test:coverage # Vitest + coverage for src/lib (thresholds enforced)
-pnpm test:e2e      # Playwright (iPhone 14 + Pixel 7); builds and serves the preview itself
+pnpm test:e2e      # Playwright (iPhone 14 on WebKit + Pixel 7 on Chromium); builds and serves the preview itself
+pnpm size          # size budget for dist/ (run pnpm build first)
+pnpm lighthouse    # Lighthouse CI on the build: mobile, 3 runs, limits in lighthouserc.json (needs Chrome; set CHROME_PATH if not found)
+pnpm screenshots   # captures public/screenshots/*.jpg (install prompt and README) from the seeded app
+pnpm analyze       # build + stats.html (rollup-plugin-visualizer treemap; not part of normal builds)
 pnpm verify        # check + lint + test
 ```
 
@@ -38,10 +42,14 @@ pnpm verify        # check + lint + test
 Path aliases: `$lib` → `src/lib`, `$components` → `src/components`. Unit tests sit next to the code as `*.test.ts`.
 
 ```
+docs/qa-checklist.md       # the real-device script (see "Quality checks")
+scripts/size.mjs            # size budget (pnpm size)
+lighthouserc.json, vercel.json   # Lighthouse limits; hosting headers (cache + CSP)
 tests/
-  setup.ts                  # Vitest setup: fake localStorage, deterministic crypto.randomUUID
+  setup.ts                  # Vitest setup: fake localStorage, deterministic crypto.randomUUID, sheet chunks preloaded
   memory-storage.ts, fixtures.ts   # test helpers
-  e2e/                      # Playwright specs
+  e2e/                      # Playwright specs: flows, a11y (axe), install/offline/update, csp, phone; seed-data.ts, static-server.ts
+  screenshots/              # pnpm screenshots (own config: playwright.screenshots.config.ts)
 src/
   lib/
     model/types.ts          # Task, Day, Routine, AppData
@@ -65,6 +73,11 @@ src/
     ui/flip.ts              # pure flip maths (angles, swipe rules, easing) and shouldAutoFlip
     ui/busy.svelte.ts       # lock held during drag/edit/menu so the page cannot flip
     ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
+    dev/seed.ts             # seedData(): realistic sample data; `?seed=N` in the dev server only; also used by screenshots and the perf test
+    ui/crash.ts             # reportError (console + one toast "Something went wrong · Reload"), installGlobalHandlers (error, unhandledrejection)
+    ui/haptics.ts           # haptic(): one short vibration (10 ms), skipped for reduced motion
+    ui/viewport.ts          # watchKeyboard(): sizes the page to the visual viewport while an iOS keyboard is up
+    ui/sheet-modules.svelte.ts   # Stats and Settings as lazy chunks (loaded on open and when idle)
     store/backup.ts         # makeBackup/readBackup/previewBackup, exportBackup (share sheet or download), backupNudge
     settings/settings.svelte.ts   # `settings` ($state, own localStorage key, cross-tab sync); types.ts (shape, parseSettings); theme.ts (applyTheme)
     stats/compute.ts        # pure stats: dailyCounts, streaks, summary, routineStats, weekdayAverages, heatmap, skippedBefore
@@ -81,8 +94,9 @@ src/
     SettingsSheet.svelte    # theme, auto-flip, backup/import/erase, storage info, about
     BackupNudge.svelte      # the reminder note under the date header on today's page
     Segmented.svelte        # radio-group pill switch (range, theme)
+    ErrorPage.svelte        # "Something went wrong. Your data is safe." with Reload and Download backup (the `failed` snippet of the error boundaries)
   styles/tokens.css, paper.css
-  App.svelte                # owns the shared LayerHistory and the open sheet (`sheets`): Notepad + Stats / Settings sheet
+  App.svelte                # owns the shared LayerHistory and the open sheet (`sheets`): Notepad + Stats / Settings sheet, each inside <svelte:boundary>
 ```
 
 ## Data model
@@ -140,12 +154,14 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - **Three pages only:** the newer page waiting above, the current page, the older page below (`neighbours()` over `app.dayKeys`, saved days only). Each is a `DayPage` inside a `.sheet` wrapper; the peel transform is on the wrapper, outside `FlipCard`, so the two 3D effects do not interfere. Pages that are not on top are `inert` and `aria-hidden`. `PageMemory` (side, scroll positions, auto-flipped) lives in the stack so pages remember themselves while unmounted.
 - **Peel hand-off rules:** the list must be at its end (bottom for older, top for newer, or fit on screen) _when the finger touches down_ (momentum guard: a list that merely reaches its end during the same touch or by momentum needs a new touch); then a vertical drag; the page only follows after a 24 px dead zone; it completes past 35 % or on a pull faster than 0.5 px/ms, otherwise it springs back. Touch uses `touchstart`/non-passive `touchmove` (the stage has `touch-action: pan-y`, so the browser cancels pointer events when it scrolls) and calls `preventDefault()` only once the peel owns the gesture; mouse and pen use Pointer Events. A swipe may start on the new-task field unless it is focused. At the ends of the stack the page stretches with resistance ("This is your first page" on the oldest page).
 - **One gesture at a time:** `gestures` (`gesture.ts`) lets a swipe either flip (horizontal) or peel (vertical); whoever locks first owns it. A running flip or peel, and anything holding `busy`, blocks the other.
-- **Other ways to turn:** "‹ Newer" / "Older ›" buttons in each page header (also for screen readers), Alt+↓ (older) / Alt+↑ (newer), and a wheel or trackpad event of about 120 px at the end of a list after a 200 ms pause (one page per burst). The Today button (past pages only) animates back through at most 5 newer pages, ~100 ms each; any more are skipped instantly. `goTo(key)` (exported by `NotepadStack`) jumps to a day, or the nearest day that has a page. **Phase 6:** heatmap cells call `goTo`. **Phase 8 (optional):** a calendar sheet from the date header.
+- **Other ways to turn:** "‹ Newer" / "Older ›" buttons in each page header (also for screen readers), Alt+↓ (older) / Alt+↑ (newer), and a wheel or trackpad event of about 120 px at the end of a list after a 200 ms pause (one page per burst). The Today button (past pages only) animates back through at most 5 newer pages, ~100 ms each; any more are skipped instantly. `goTo(key)` (exported by `NotepadStack`) jumps to a day, or the nearest day that has a page. **Phase 6:** heatmap cells call `goTo`. **Planned for 1.1 (optional):** a calendar sheet from the date header.
 - **Past pages:** read-only (`editable=false`), softer ink (`--ink-past`), a lock icon, "Yesterday" / "3 days ago" in the header, and "Copy to today" on unfinished one-off tasks. Missed days have no page and are skipped; the page below a gap shows "2 days skipped" at the top of its list.
 - **Back button (`LayerHistory`):** one history entry per layer, however many pages you peel; Back closes the top layer. Peeling away from today opens the `past` layer; Back on a past page animates to today; Today or peeling back to today removes the entry with `history.back()`; Back on today leaves the app. A reload opens on today and clears any leftover entry. `stats` and `settings` are further layers (one sheet at a time, opened from `App`); the task menu could be one too.
 - **New day while open:** on today, the new day lays down on top, the old today becomes the read-only page below, and a toast says "It's a new day". On a past page nothing moves; Today and Back lead to the new day.
 - **After a peel:** focus moves to the new page's date heading and an `aria-live` message reads "Friday, October 24 · Yesterday · read-only" (plus "2 days skipped").
 - Animate only `transform` and `opacity`. Aim for 60 fps on mid-range phones.
+- **Motion tokens:** every duration and easing is defined once, in `MOTION` / `EASE_PAGE` (`ui/motion.ts`) and as `--dur-fast|base|sheet|peel|flip` / `--ease-page` / `--ease-out` in `tokens.css`; `motion.test.ts` keeps the two in step. `flip.ts`, `peel.ts` and `sheet.ts` take their durations from `MOTION`; CSS uses the variables. Add new motion there, not as literals.
+- **Haptics** (`haptic()`, Android only; iOS has no vibration API): one 10 ms pulse, the same everywhere: checking a task, picking a task up to drag, a flip finishing and a peel landing. Nothing for reduced motion.
 - With `prefers-reduced-motion` on, the flip becomes a 150 ms crossfade (no 3D, no tilt; swipes still switch sides but nothing follows the finger) and the peel becomes a plain scroll. The crossfade uses WAAPI because the global reduced-motion CSS zeroes CSS transitions.
 - The flip button (turned corner, bottom right) has `aria-label` "Show done list" / "Show to-do list", `aria-pressed` and shows the other side's count; the count bumps when it changes.
 - Header on every face: date line (with Stats and Settings) and a caption line (side · how long ago · lock) with the page buttons. Long dates shrink with `clamp()`.
@@ -168,6 +184,31 @@ Everything is computed from `AppData`, `today` and the week start by pure functi
 - **Accessibility:** each chart is `<svg role="img">` with a summary label plus a visually hidden table (wrapped in a `div.sr-only`: a bare `table.sr-only` still stretches the scroller); tiles are a `<dl>`; the range switch is a radio group; the heatmap is a roving-tabindex grid (arrows move, Enter opens) and the bar chart takes arrow keys too.
 - PWA updates: `registerType: 'prompt'` (`workbox-window` is a dev dependency bundled by Vite); `main.ts` registers the service worker and a waiting version shows as "Update available · Reload" in Settings. `__APP_VERSION__` / `__BUILD_DATE__` come from `vite.config.ts`. Danger colours are `--danger` / `--on-danger` in `tokens.css`.
 - `.row` is a global class in `paper.css`; chart markup must not reuse it.
+
+## Quality checks and limits
+
+CI (`.github/workflows/ci.yml`) has three jobs; all must pass.
+
+- **verify:** `pnpm verify`, `pnpm build`, then `pnpm size`: fails over **60 KB gzipped JS**, **15 KB gzipped CSS**, **120 KB Latin woff2 fonts** (the `-ext` font files only load for those letters and are not counted). Today: about 54 / 9 / 97 KB.
+- **e2e:** `pnpm test:e2e` on WebKit (iPhone 14) and Chromium (Pixel 7) against the production build (served by `vite preview` with the same headers as Vercel). Traces and screenshots upload when it fails. It includes:
+  - `a11y.spec.ts`: axe scans of today, the done side, a past page, Stats, Settings, the import preview and both erase steps, in light and dark; any **serious or critical** violation fails.
+  - `install.spec.ts` (Chromium only): manifest fields and screenshots, service worker registered, reload while offline (add, flip, Stats, backup), and the update flow with two builds (`dist-v2` is built with `FLIPSIDE_VERSION=9.9.9`, served by `static-server.ts`, and "Update available · Reload" must bring it in).
+  - `csp.spec.ts` (no CSP violations while using every screen), `phone.spec.ts` (inputs at least 16px, a 2,000-character task, 200 tasks, emoji and right-to-left text, landscape).
+- **lighthouse:** `pnpm lighthouse` (`lighthouserc.json`), mobile profile, 3 runs, the **median run** counts. Fails: Accessibility below 100, Best Practices below 95, SEO below 90, layout shift over 0.05, Performance below 90. **Warns:** Performance below 95. Lighthouse has no PWA category, so install checks are in Playwright. `lighthouse-preview.yml` runs the same limits on each Vercel preview deployment (`deployment_status`); if Deployment Protection is on, set the `VERCEL_AUTOMATION_BYPASS_SECRET` secret.
+- Unit tests include `perf.test.ts` (3 years, about 9,500 tasks: load 10 ms, save 3 ms, Stats 3 ms, import 9 ms on a desktop; the test limit is 150 ms) and `headers.test.ts` (the CSP hash must match the inline script in `index.html`: **if you change that script, update the `sha256-` in `vercel.json`**; the test tells you).
+- **Real devices:** `docs/qa-checklist.md` is the script (iPhone Safari + installed, Android Chrome + installed, plus quick checks and screen readers). Each run is a GitHub issue "QA run YYYY-MM-DD · device · OS", each problem its own issue. `?seed=365` / `?seed=1100` in the dev server (`pnpm dev --host`) gives realistic data for the performance traces.
+
+## Hosting and errors
+
+- **`vercel.json`:** `/assets/*` cached for a year (`immutable`); `/`, `index.html`, `sw.js` and `manifest.webmanifest` are `no-cache`; every page gets a strict CSP (`default-src 'self'`, inline script only by hash, `style-src 'self' 'unsafe-inline'` because Svelte sets style attributes, `img-src` with `data:` for the paper grain, `frame-ancestors 'none'`), `nosniff`, `no-referrer`, and a Permissions-Policy. `vite.config.ts` reads the same headers for `vite preview`, so tests run under the real CSP.
+- **No analytics and no error reporting service:** the app stays private and local. Errors go to the console only.
+- **Error boundaries:** the notepad and the open sheet are each inside a `<svelte:boundary>` in `App.svelte`; a rendering bug shows `ErrorPage` ("Something went wrong. Your data is safe.", Reload, Download backup; the backup falls back to the raw saved text if exporting the live data itself fails). `installGlobalHandlers()` (called in `main.ts`) turns an uncaught error or unhandled rejection into one toast "Something went wrong · Reload" at most every 10 s, and logs the details.
+- **Lazy sheets:** `StatsView` and `SettingsSheet` are separate chunks (`sheet-modules.svelte.ts`), fetched on first open and when the browser is idle, so they open at once and are in the service worker's precache for offline use. Tests preload them in `tests/setup.ts`.
+- **Updates:** `registerType: 'prompt'` with `clientsClaim: true`, so even the first visit is controlled. "Update available · Reload" calls `applyUpdate()` (`ui/reload.ts`): ask the waiting worker to take over, reload on `controllerchange`, or after 4 s regardless.
+- **Fonts:** Caveat 700 (headings and the task field) and Inter 400 and 600, Latin and Latin Extended only (`@fontsource/*`, `font-display: swap`); the Latin Caveat file is preloaded by a small plugin in `vite.config.ts`.
+- **Install:** the manifest has `screenshots` (4 phone images, 1 dark, 1 wide; JPEG from `pnpm screenshots`) and no `shortcuts`: **do not add app shortcuts** (such as a "New task" shortcut); the app opens on today's page with the field ready. The screenshots and iOS launch screens (`apple-splash-*`) are excluded from the service worker precache. Re-run `pnpm screenshots` when the UI changes visibly.
+- **Phone details:** every input is at least 16px (iOS zooms smaller ones; one global rule in `paper.css`), `overscroll-behavior: none` on `html` and `body`, `interactive-widget=resizes-content` in the viewport meta (Android resizes the layout for the keyboard), `watchKeyboard()` for iOS (page sized to the visual viewport while the keyboard is up, pan undone), `dir="auto"` and `text-align: start` on task text.
+- **Planned for 1.1 (optional):** a calendar sheet from the date header, after real use.
 
 ## Today page interactions
 
@@ -202,5 +243,5 @@ Components take a date `key` and an `editable` flag (`app.isEditable(key)`), so 
 5. Notepad stack: scroll peel, browsing earlier days
 6. Stats: 30-day bars, streaks, routine completion %, heatmap
 7. Backup and settings: export, import, theme (done)
-8. Polish and QA: real-device iOS Safari and Android Chrome, Lighthouse
+8. Polish and QA: real-device iOS Safari and Android Chrome, Lighthouse (done in code; run `docs/qa-checklist.md` on the phones, then tag `v1.0.0`)
 9. Deploy as a static site, with CI running tests and the build

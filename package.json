@@ -1,7 +1,7 @@
 {
   "name": "flipside",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,7 +18,8 @@
     "test:coverage": "vitest run --coverage",
     "size": "node scripts/size.mjs",
     "screenshots": "playwright test -c playwright.screenshots.config.ts",
-    "lighthouse": "lhci autorun"
+    "lighthouse": "lhci autorun",
+    "analyze": "ANALYZE=1 vite build"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
@@ -41,6 +42,7 @@
     "jsdom": "^30.1.3",
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
+    "rollup-plugin-visualizer": "^7.1.1",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
     "typescript": "~6.0.3",
