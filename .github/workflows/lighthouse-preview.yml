@@ -1,0 +1,35 @@
+name: Lighthouse (preview deployment)
+
+# Vercel reports each finished preview deployment to GitHub; the same Lighthouse limits run on it.
+on: deployment_status
+
+jobs:
+  lighthouse:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment_status.environment != 'Production'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # If Deployment Protection is on, add the "Protection Bypass for Automation" secret as
+      # VERCEL_AUTOMATION_BYPASS_SECRET so the run can open the preview.
+      - name: Lighthouse on the preview
+        env:
+          PREVIEW_URL: ${{ github.event.deployment_status.target_url }}
+          BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          args=(--collect.url="$PREVIEW_URL" --collect.startServerCommand=)
+          if [ -n "$BYPASS" ]; then
+            args+=(--collect.settings.extraHeaders="{\"x-vercel-protection-bypass\":\"$BYPASS\"}")
+          fi
+          pnpm exec lhci autorun "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-preview-reports
+          path: .lighthouseci/
+          retention-days: 14

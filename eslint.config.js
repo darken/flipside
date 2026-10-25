@@ -8,6 +8,8 @@ export default ts.config(
   {
     ignores: [
       'dist/',
+      'dist-v2/',
+      '.lighthouseci/',
       'dev-dist/',
       'node_modules/',
       'playwright-report/',

@@ -15,12 +15,17 @@
     "test:e2e": "playwright test",
     "icons": "pwa-assets-generator",
     "verify": "pnpm check && pnpm lint && pnpm test",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "size": "node scripts/size.mjs",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
+    "lighthouse": "lhci autorun"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
     "@fontsource/caveat": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.64.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/jest-dom": "^7.0.1",
