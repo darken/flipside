@@ -16,7 +16,7 @@ It is a frontend-only single-page app with no backend. All data lives in `localS
 
 ## Commands
 
-Package manager: **pnpm** (don't use npm or yarn, and don't commit other lockfiles). Node 22 (`.nvmrc`). TypeScript is pinned to 6.x because `svelte-check` and `typescript-eslint` don't support 7 yet.
+Package manager: **pnpm** (don't use npm or yarn, and don't commit other lockfiles). Node 24 LTS (`.nvmrc`; `engines` allows >=22). TypeScript is pinned to 6.x because `svelte-check` and `typescript-eslint` don't support 7 yet.
 
 ```bash
 pnpm install
