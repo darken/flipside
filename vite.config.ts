@@ -4,6 +4,9 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
+// Fixed zone with daylight saving, so date tests are the same on every machine.
+if (process.env.VITEST) process.env.TZ = 'America/New_York';
+
 const alias = {
   $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
   $components: fileURLToPath(new URL('./src/components', import.meta.url)),
@@ -49,5 +52,11 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     include: ['src/**/*.test.ts'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      include: ['src/lib/**/*.ts'],
+      exclude: ['src/lib/**/*.test.ts', 'src/lib/model/types.ts'],
+      thresholds: { statements: 90, lines: 90, functions: 90, branches: 85 },
+    },
   },
 });

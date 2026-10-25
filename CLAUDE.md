@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phase 1 (scaffold) is done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold) and 2 (data layer) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -27,7 +27,8 @@ pnpm check         # svelte-check + tsc (node configs)
 pnpm lint          # ESLint + Prettier --check
 pnpm format        # Prettier --write
 pnpm icons         # regenerate PWA icons from public/icon.svg
-pnpm test          # Vitest
+pnpm test          # Vitest (TZ fixed to America/New_York)
+pnpm test:coverage # Vitest + coverage for src/lib (thresholds enforced)
 pnpm test:e2e      # Playwright (iPhone 14 + Pixel 7); builds and serves the preview itself
 pnpm verify        # check + lint + test
 ```
@@ -39,15 +40,19 @@ Path aliases: `$lib` → `src/lib`, `$components` → `src/components`. Unit tes
 ```
 tests/
   setup.ts                  # Vitest setup: fake localStorage, deterministic crypto.randomUUID
+  memory-storage.ts, fixtures.ts   # test helpers
   e2e/                      # Playwright specs
 src/
   lib/
     model/types.ts          # Task, Day, Routine, AppData
-    model/dates.ts          # local-date helpers (YYYY-MM-DD)
-    store/app.svelte.ts     # $state store + derived selectors
-    store/persist.ts        # localStorage load/save (debounced), migrations
-    store/routines.ts       # routine tasks for a new day
-    store/backup.ts         # JSON export/import + validation
+    model/dates.ts          # local-date helpers (YYYY-MM-DD), formatHeading, isPast
+    model/tasks.ts          # pure task ops on a Day (add, edit, move, copyToToday), selectors
+    store/app.svelte.ts     # AppStore ($state), exported as `app`; rollover, cross-tab sync
+    store/guard.ts          # assertEditable / ReadOnlyDayError
+    store/persist.ts        # localStorage load/save, debounced saver, migrate, corrupt backup
+    store/routines.ts       # ensureDay, makeRoutine, stopRoutine, renameRoutine
+    store/validate.ts       # parseAppData: hand-written validation, reused by import
+    store/backup.ts         # JSON export/import (Phase 7)
     stats/compute.ts        # pure stats functions
   components/
     NotepadStack.svelte     # day pages stack, scroll-driven peel
@@ -78,14 +83,18 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 ## Domain rules
 
 - **Todo vs. done:** a task is done when `doneAt` is set. Unchecking clears it. There are no separate lists in storage.
-- **Routines:** the first time a day is opened, add one fresh, undone task for each active routine (linked by `routineId`). Never add the same routine twice to one day. Turning the routine flag off makes it inactive; past instances stay untouched.
-- **Unfinished one-off tasks** stay on their own day. Past pages have a "Move to today" action.
-- **Past days** can be edited. **Future days** are not supported yet.
+- **Routines:** the first time a day is opened, add one fresh, undone task for each active routine (linked by `routineId`). Never add the same routine twice to one day. Missed days are not filled in. Turning the routine flag off makes it inactive; past instances keep their `routineId` (stats need it).
+- **Editing a routine task's text** is allowed and also renames the routine, so future days use the new text. Past instances keep their old text.
+- **Past days are read-only:** no adding, editing, checking/unchecking, reordering or deleting. Enforce this in the store (mutations on a date before `today` are rejected), not only in the UI. At midnight, yesterday becomes read-only as it is.
+- **Unfinished one-off tasks** stay on their own day. Past pages offer "Copy to today", which adds a new task to today and leaves the past day unchanged.
+- **Future days** are not supported yet.
 - **Dates** are always the user's local calendar date. Never derive them from `toISOString()` (that is UTC and shifts the day). Use the helpers in `dates.ts`.
 
 ## Persistence
 
 - One localStorage key: `flipside:v1`. Save about 300 ms after each change. Wrap every read and write in try/catch, and fall back to in-memory state if storage is unavailable.
+- Corrupt data is copied to `flipside:v1:corrupt-<timestamp>` and the app starts empty. A failed save sets `app.storageOk = false`; the app keeps working in memory. Another tab's save is picked up through the `storage` event.
+- **Day rollover:** `app.tick()` runs every minute and on `visibilitychange`, and before every mutation, so the new day opens with its routine tasks and yesterday turns read-only.
 - Any change to the shape of `AppData` bumps `version` and adds a migration in `persist.ts`.
 - Export downloads `flipside-backup-YYYY-MM-DD.json`. Import validates the file's structure and version, shows a preview, and asks for confirmation before replacing data.
 
@@ -103,6 +112,7 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 
 - Keep logic in `src/lib` as pure TypeScript functions (dates, routines, stats, backup), with unit tests. Components stay thin.
 - Use Svelte 5 runes only. No legacy `export let`, `$:` or `svelte/store`.
+- In dev, `window.app` is the store, for the console.
 - Make IDs with `crypto.randomUUID()`.
 - Add no runtime dependencies without a clear reason; bundle size matters.
 - Before calling a phase done, run `pnpm verify`.

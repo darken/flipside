@@ -24,3 +24,6 @@ yarn.lock
 .vscode/*
 !.vscode/extensions.json
 *.tsbuildinfo
+
+# Coverage
+coverage/

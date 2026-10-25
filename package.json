@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "icons": "pwa-assets-generator",
-    "verify": "pnpm check && pnpm lint && pnpm test"
+    "verify": "pnpm check && pnpm lint && pnpm test",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -27,6 +28,7 @@
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.6.5",
     "@vite-pwa/assets-generator": "^2.0.0",
+    "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-svelte": "^3.23.1",

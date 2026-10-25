@@ -5,7 +5,16 @@ import globals from 'globals';
 import ts from 'typescript-eslint';
 
 export default ts.config(
-  { ignores: ['dist/', 'dev-dist/', 'node_modules/', 'playwright-report/', 'test-results/'] },
+  {
+    ignores: [
+      'dist/',
+      'dev-dist/',
+      'node_modules/',
+      'playwright-report/',
+      'test-results/',
+      'coverage/',
+    ],
+  },
   js.configs.recommended,
   ...ts.configs.recommended,
   ...svelte.configs.recommended,

@@ -6,5 +6,11 @@ import './styles/tokens.css';
 import './styles/paper.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
+import { app } from '$lib/store/app.svelte';
+
+app.init();
+
+// Handy for poking at the data layer from the console until the UI exists.
+if (import.meta.env.DEV) (window as unknown as { app: typeof app }).app = app;
 
 export default mount(App, { target: document.getElementById('app')! });

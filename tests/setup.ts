@@ -1,28 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
 import { afterEach, beforeEach, vi } from 'vitest';
-
-class MemoryStorage implements Storage {
-  #data = new Map<string, string>();
-  get length() {
-    return this.#data.size;
-  }
-  clear() {
-    this.#data.clear();
-  }
-  getItem(key: string) {
-    return this.#data.get(key) ?? null;
-  }
-  key(index: number) {
-    return [...this.#data.keys()][index] ?? null;
-  }
-  removeItem(key: string) {
-    this.#data.delete(key);
-  }
-  setItem(key: string, value: string) {
-    this.#data.set(key, String(value));
-  }
-}
+import { MemoryStorage } from './memory-storage';
 
 beforeEach(() => {
   vi.stubGlobal('localStorage', new MemoryStorage());

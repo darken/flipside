@@ -1,9 +1,8 @@
 <script lang="ts">
-  const heading = new Intl.DateTimeFormat(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date());
+  import { formatHeading } from '$lib/model/dates';
+  import { app } from '$lib/store/app.svelte';
+
+  const heading = $derived(formatHeading(app.today));
 </script>
 
 <main class="shell">
