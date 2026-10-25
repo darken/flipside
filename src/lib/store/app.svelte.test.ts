@@ -139,6 +139,45 @@ describe('editing today', () => {
   });
 });
 
+describe('remove and restore', () => {
+  it('undoes a delete with the same id and position', () => {
+    const store = open();
+    const a = store.add(T1, 'a')!;
+    const b = store.add(T1, 'b')!;
+    store.add(T1, 'c');
+    const copy = $state.snapshot(b);
+    store.remove(T1, b.id);
+    expect(texts(store, T1)).toEqual(['a', 'c']);
+    store.restore(T1, copy);
+    expect(texts(store, T1)).toEqual(['a', 'b', 'c']);
+    expect(store.day(T1)!.tasks.map((t) => t.id)).toContain(a.id);
+    expect(store.day(T1)!.tasks.find((t) => t.text === 'b')!.id).toBe(b.id);
+  });
+
+  it('is rejected on a past day', () => {
+    const store = open();
+    const t = store.add(T1, 'a')!;
+    const copy = $state.snapshot(t);
+    store.remove(T1, t.id);
+    clock = new Date(2026, 9, 26, 0, 0, 5);
+    expect(() => store.restore(T1, copy)).toThrow(ReadOnlyDayError);
+    expect(texts(store, T1)).toEqual([]);
+  });
+});
+
+describe('isRoutine', () => {
+  it('is true only while the routine is active', () => {
+    const store = open();
+    const t = store.add(T1, 'Stretch')!;
+    expect(store.isRoutine(t)).toBe(false);
+    store.setRoutine(T1, t.id, true);
+    const linked = store.day(T1)!.tasks[0]!;
+    expect(store.isRoutine(linked)).toBe(true);
+    store.setRoutine(T1, t.id, false);
+    expect(store.isRoutine(linked)).toBe(false);
+  });
+});
+
 describe('routines across midnight', () => {
   it('creates the new day with its routine tasks and no carry-over', () => {
     const store = open();

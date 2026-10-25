@@ -75,3 +75,10 @@ export function formatHeading(key: DateKey, locale?: string): string {
     day: 'numeric',
   }).format(parseKey(key));
 }
+
+/** Local time of day for an ISO timestamp, such as "14:32" or "2:32 PM" depending on locale. */
+export function formatTime(iso: string, locale?: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(
+    new Date(iso),
+  );
+}

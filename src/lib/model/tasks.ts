@@ -82,6 +82,12 @@ export function addTask(
   return { day: { ...day, tasks: [...day.tasks, task] }, task };
 }
 
+/** Puts a deleted task back with its original id and order (used by Undo). */
+export function restoreTask(day: Day, task: Task): Day {
+  if (day.tasks.some((t) => t.id === task.id)) throw new Error(`Task already exists: ${task.id}`);
+  return { ...day, tasks: [...day.tasks, task] };
+}
+
 export function editTask(day: Day, id: string, text: string): Day {
   const clean = normalizeText(text);
   if (clean === null) throw new EmptyTextError();

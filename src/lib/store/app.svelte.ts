@@ -9,6 +9,7 @@ import {
   moveTask,
   normalizeText,
   putDay,
+  restoreTask,
   setDone,
 } from '$lib/model/tasks';
 import { emptyData } from '$lib/model/types';
@@ -118,6 +119,20 @@ export class AppStore {
     const { day, task } = addTask(getDay(this.data, key), text, this.#now());
     this.#commit(putDay(this.data, day));
     return task;
+  }
+
+  /** True when the task belongs to a routine that is still active. */
+  isRoutine(task: Task): boolean {
+    return (
+      task.routineId !== undefined &&
+      this.data.routines.some((r) => r.id === task.routineId && r.active)
+    );
+  }
+
+  /** Puts a deleted task back with its id and order (Undo). */
+  restore(key: DateKey, task: Task): void {
+    this.#assertEditable(key);
+    this.#commit(putDay(this.data, restoreTask(getDay(this.data, key), task)));
   }
 
   /** Returns false (and changes nothing) if the new text is blank. */

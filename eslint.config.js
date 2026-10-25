@@ -24,6 +24,11 @@ export default ts.config(
     languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   {
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    },
+  },
+  {
     files: ['**/*.svelte', '**/*.svelte.ts'],
     languageOptions: { parserOptions: { parser: ts.parser } },
   },

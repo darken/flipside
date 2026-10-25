@@ -12,6 +12,7 @@ import {
   moveTask,
   normalizeText,
   putDay,
+  restoreTask,
   setDone,
   todoTasks,
 } from './tasks';
@@ -239,5 +240,21 @@ describe('getDay and putDay', () => {
     const next = putDay(data, day('2026-10-25'));
     expect(Object.keys(data.days)).toEqual([]);
     expect(Object.keys(next.days)).toEqual(['2026-10-25']);
+  });
+});
+
+describe('restoreTask', () => {
+  it('puts a deleted task back in its old position', () => {
+    const a = task({ id: 'a', order: 0 });
+    const b = task({ id: 'b', order: 1 });
+    const c = task({ id: 'c', order: 2 });
+    const d = day('d', [a, b, c]);
+    const restored = restoreTask(deleteTask(d, 'b'), b);
+    expect(ids(todoTasks(restored))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('refuses to duplicate an id', () => {
+    const a = task({ id: 'a' });
+    expect(() => restoreTask(day('d', [a]), a)).toThrow(/already exists/);
   });
 });

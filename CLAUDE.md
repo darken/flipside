@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold) and 2 (data layer) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer) and 3 (today page) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -52,12 +52,15 @@ src/
     store/persist.ts        # localStorage load/save, debounced saver, migrate, corrupt backup
     store/routines.ts       # ensureDay, makeRoutine, stopRoutine, renameRoutine
     store/validate.ts       # parseAppData: hand-written validation, reused by import
+    ui/toast.svelte.ts      # toast queue (`toasts`), shown by Toast.svelte
+    ui/guarded.ts           # guarded(): turns ReadOnlyDayError into a toast
+    ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
     store/backup.ts         # JSON export/import (Phase 7)
     stats/compute.ts        # pure stats functions
   components/
     NotepadStack.svelte     # day pages stack, scroll-driven peel
     DayPage.svelte          # two-sided flip card
-    TodoSide.svelte, DoneSide.svelte, TaskItem.svelte, TaskInput.svelte
+    TodoSide.svelte, DoneSide.svelte, TaskItem.svelte, TaskInput.svelte, TaskMenu.svelte, Toast.svelte
     StatsView.svelte, charts/BarChart.svelte, charts/Heatmap.svelte
     SettingsSheet.svelte
   styles/tokens.css, paper.css
@@ -108,10 +111,25 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - The flip button has an accessible label and the hidden face is `inert`.
 - Colours, spacing and shadows come from `tokens.css`, with light (paper) and dark themes.
 
+## Today page interactions
+
+Components take a date `key` and an `editable` flag (`app.isEditable(key)`), so past pages reuse them read-only. Every store change goes through `guarded()` (a `ReadOnlyDayError` becomes the toast "It's a new day…", and the page follows `app.today`).
+
+- **Layout:** every row is a multiple of `--line-height` (32px) so text sits on the ruled lines. 44px tap targets stick out of the row with negative margins or absolute positioning; they must never make a row taller.
+- **New task input** (`TaskInput`): sits on the first empty line after the list. Enter = new line; ✓ Add or Cmd/Ctrl+Enter adds; Escape clears; blank text is ignored. The ↻ toggle adds the task as a routine (resets after each add). The field stays focused after adding.
+- **Edit in place:** tap the task text. Cmd/Ctrl+Enter or blur saves, Escape cancels, blank text cancels. Routine tasks show a hint that the routine is renamed too.
+- **Check off:** the checkbox calls `app.toggleDone`. A checked task leaves the todo list with a strike-through fade (`taskFade`); unchecking on the done side sends it back to the end of the todo list.
+- **"⋯" menu** (`TaskMenu`, a bottom sheet with a focus trap, closes on Escape): Make/Stop routine, Move up/down, Delete. Menu actions receive the task they were opened for, because the menu closes before the action runs.
+- **Reordering:** drag the ⋮⋮ handle, or long-press the text (~300 ms). Pointer Events only; the page autoscrolls near the edges; releasing calls `app.move`. Keyboard: Enter/Space on the handle picks up, arrows move, Enter drops, Escape cancels; positions are announced in an `aria-live` region. Only the todo list can be reordered.
+- **Delete** removes at once and shows "Task deleted · Undo" for 5 s; Undo calls `app.restore(key, task)` (same id and order, guarded like any change).
+- **Read-only pages:** no input, handle, menu or editing; checkboxes are disabled; unfinished one-off tasks get "Copy to today".
+- **Reduced motion:** `motion(ms)` returns 0 and CSS transitions are cut, so check-off and reorder animations are off. Tests stub `matchMedia` to reduce motion.
+
 ## Conventions
 
 - Keep logic in `src/lib` as pure TypeScript functions (dates, routines, stats, backup), with unit tests. Components stay thin.
 - Use Svelte 5 runes only. No legacy `export let`, `$:` or `svelte/store`.
+- Component tests use the `app` singleton: `vi.useFakeTimers({ toFake: ['Date', 'setTimeout', …] })`, `app.init()` in `beforeEach` and its dispose function in `afterEach` (storage is the stubbed in-memory `localStorage`).
 - In dev, `window.app` is the store, for the console.
 - Make IDs with `crypto.randomUUID()`.
 - Add no runtime dependencies without a clear reason; bundle size matters.

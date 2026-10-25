@@ -4,6 +4,7 @@ import {
   compareKeys,
   daysBetween,
   formatHeading,
+  formatTime,
   isPast,
   isValidKey,
   parseKey,
@@ -160,5 +161,17 @@ describe('formatHeading', () => {
 
   it('defaults to the runtime locale', () => {
     expect(formatHeading('2026-10-25')).toContain('25');
+  });
+});
+
+describe('formatTime', () => {
+  it('shows the local time, not UTC', () => {
+    // 18:32 UTC is 14:32 in New York during daylight saving time.
+    expect(formatTime('2026-10-25T18:32:00.000Z', 'en-GB')).toBe('14:32');
+    expect(formatTime('2026-10-25T18:32:00.000Z', 'en-US')).toMatch(/2:32\sPM/);
+  });
+
+  it('defaults to the runtime locale', () => {
+    expect(formatTime('2026-10-25T18:32:00.000Z')).toContain('32');
   });
 });
