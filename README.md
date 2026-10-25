@@ -2,6 +2,8 @@
 
 A mobile-first daily todo app that feels like a paper notepad.
 
+**[Try it live → flipside-self.vercel.app](https://flipside-self.vercel.app)** (best on a phone; add it to your home screen to install it)
+
 Each day is one page. The front shows your to-do list and the back shows what you've done: flip the page to switch sides. Pull up past the end of the list to peel the page away and see earlier days underneath. A stats sheet shows streaks, daily totals, routine completion and a year-long heatmap.
 
 Flipside runs entirely in the browser. There is no backend and no account: your data stays in `localStorage` on your device, and the app works offline and can be installed on a phone as a PWA.
@@ -74,7 +76,7 @@ Logic lives in `src/lib` as pure, unit-tested functions; components stay thin. S
 
 Everything is stored under one `localStorage` key, `flipside:v1`, and saved shortly after each change. If the stored data is ever unreadable, it is copied aside to `flipside:v1:corrupt-<timestamp>` rather than lost, and the app starts fresh. Changes made in another tab are picked up automatically.
 
-Clearing your browser's site data deletes your tasks. JSON export and import are coming in the next phase.
+Data is not synced: tasks you add on the live app stay in that browser on that device. Clearing your browser's site data deletes your tasks. JSON export and import are coming in the next phase.
 
 ## Roadmap
 
@@ -86,4 +88,4 @@ Clearing your browser's site data deletes your tasks. JSON export and import are
 6. ~~Stats~~
 7. Backup and settings: export, import, theme
 8. Polish and QA on real iOS Safari and Android Chrome devices, Lighthouse
-9. Deploy as a static site, with CI running tests and the build
+9. ~~Deploy as a static site, with CI running tests and the build~~ (Vercel; GitHub Actions)
