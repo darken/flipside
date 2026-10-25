@@ -13,6 +13,7 @@ html {
 
 body {
   margin: 0;
+  overscroll-behavior: none;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--desk);
@@ -22,6 +23,12 @@ body {
   line-height: var(--line-height);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+}
+
+/* iOS Safari zooms into any field whose text is smaller than 16px */
+input:not([type='checkbox'], [type='radio'], [type='file']),
+textarea {
+  font-size: max(16px, 1em);
 }
 
 button {
@@ -135,11 +142,11 @@ p {
 :root.theme-fade *::before,
 :root.theme-fade *::after {
   transition:
-    background-color 200ms ease,
-    color 200ms ease,
-    border-color 200ms ease,
-    fill 200ms ease,
-    stroke 200ms ease !important;
+    background-color var(--dur-base) ease,
+    color var(--dur-base) ease,
+    border-color var(--dur-base) ease,
+    fill var(--dur-base) ease,
+    stroke var(--dur-base) ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

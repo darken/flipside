@@ -259,7 +259,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     .bar {
-      animation: grow 450ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+      animation: grow var(--dur-peel) var(--ease-page) backwards;
     }
   }
   @keyframes grow {

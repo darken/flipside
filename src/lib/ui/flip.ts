@@ -1,8 +1,10 @@
+import { EASE_PAGE, MOTION } from './motion';
+
 export type Side = 'todo' | 'done';
 
-export const FLIP_MS = 600;
-export const FLIP_EASING = [0.2, 0.7, 0.2, 1] as const;
-export const CROSSFADE_MS = 150;
+export const FLIP_MS: number = MOTION.flip;
+export const FLIP_EASING = EASE_PAGE;
+export const CROSSFADE_MS: number = MOTION.fast;
 /** A swipe faster than this finishes the flip even if it is short. */
 export const FLING_PX_PER_MS = 0.5;
 /** Swipes starting this close to a screen edge are left to the browser's back gesture. */

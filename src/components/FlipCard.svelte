@@ -17,6 +17,7 @@
     type Side,
   } from '$lib/ui/flip';
   import { gestures, lockDirection } from '$lib/ui/gesture';
+  import { haptic } from '$lib/ui/haptics';
   import { inertWhen } from '$lib/ui/inert';
   import { reducedMotion } from '$lib/ui/motion';
 
@@ -100,7 +101,10 @@
     gestures.release('flip');
     angle = normalizeAngle(to);
     apply(angle);
-    if (notify) onFlipped?.(shown);
+    if (notify) {
+      haptic();
+      onFlipped?.(shown);
+    }
   }
 
   /** Animates the card from one angle to another using only compositor properties. */

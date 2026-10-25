@@ -1,10 +1,14 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/svelte';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { settings } from '$lib/settings/settings.svelte';
 import { nudge } from '$lib/ui/nudge.svelte';
+import { sheetModules } from '$lib/ui/sheet-modules.svelte';
 import { sheets } from '$lib/ui/sheets.svelte';
 import { MemoryStorage } from './memory-storage';
+
+// The sheets are lazy chunks in the app; tests want them there from the first click.
+beforeAll(() => sheetModules.loadAll());
 
 // jsdom has no Web Animations API; Svelte's transitions look for it when elements leave.
 Element.prototype.getAnimations ??= () => [];

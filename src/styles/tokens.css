@@ -47,6 +47,15 @@
   --line-height: 32px;
   --margin-x: 56px;
 
+  /* Motion: keep in step with MOTION / EASE_PAGE in lib/ui/motion.ts */
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-sheet: 350ms;
+  --dur-peel: 450ms;
+  --dur-flip: 600ms;
+  --ease-page: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: ease-out;
+
   /* Layout */
   --page-max-width: 480px;
   --tap-target: 44px;

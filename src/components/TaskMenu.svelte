@@ -94,7 +94,7 @@
     background: var(--paper-cream);
     color: var(--ink);
     box-shadow: var(--shadow-lift);
-    animation: rise 160ms ease-out;
+    animation: rise var(--dur-fast) var(--ease-out);
   }
   .preview {
     margin-bottom: var(--space-2);

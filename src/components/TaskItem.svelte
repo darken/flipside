@@ -2,6 +2,7 @@
   import { formatTime } from '$lib/model/dates';
   import type { DateKey, Task } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
+  import { haptic } from '$lib/ui/haptics';
   import { autosize } from '$lib/ui/autosize';
   import { busy } from '$lib/ui/busy.svelte';
   import { guarded } from '$lib/ui/guarded';
@@ -54,6 +55,7 @@
   function toggle(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     setLeaving(done ? 'removed' : 'done');
+    haptic();
     guarded(() => app.toggleDone(key, task.id));
     // If the change was refused the box must show what is really stored.
     const nowDone = app.day(key)?.tasks.find((t) => t.id === task.id)?.doneAt !== undefined;
@@ -150,6 +152,7 @@
     {#if editing}
       <textarea
         class="text edit"
+        dir="auto"
         rows="1"
         aria-label="Edit task"
         bind:value={draft}
@@ -164,12 +167,13 @@
       <button
         type="button"
         class="text"
+        dir="auto"
         onclick={startEdit}
         onpointerdown={onTextPointerDown}
         oncontextmenu={(e) => dragging && e.preventDefault()}>{task.text}</button
       >
     {:else}
-      <p class="text">{task.text}</p>
+      <p class="text" dir="auto">{task.text}</p>
     {/if}
     {#if canCopy}
       <button
@@ -234,7 +238,7 @@
     position: relative;
   }
   .item.shifting {
-    transition: transform 150ms ease;
+    transition: transform var(--dur-fast) ease;
   }
   .item.dragging {
     z-index: 2;
@@ -281,7 +285,7 @@
     border: solid var(--paper-cream);
     border-width: 0 2.5px 2.5px 0;
     transform: rotate(45deg) scale(0);
-    transition: transform 120ms ease;
+    transition: transform var(--dur-fast) ease;
   }
   input:checked + .box,
   :global(.striking) .box {

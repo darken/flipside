@@ -1,6 +1,7 @@
 import { daysBetween } from '$lib/model/dates';
 import type { DateKey } from '$lib/model/types';
 import { cubicBezier } from './flip';
+import { MOTION } from './motion';
 
 /** The page only starts to follow the finger after this much pulling past the end of the list. */
 export const DEAD_ZONE_PX = 24;
@@ -8,12 +9,12 @@ export const DEAD_ZONE_PX = 24;
 export const COMMIT_PROGRESS = 0.35;
 /** …or when the pull is faster than this (px/ms). */
 export const FLING_PX_PER_MS = 0.5;
-export const PEEL_MS = 450;
+export const PEEL_MS: number = MOTION.peel;
 /** How far the leaving page tilts back from the binding at full peel. */
 export const PEEL_TILT_DEG = 12;
 export const UNDER_SCALE = 0.96;
 export const UNDER_DIM = 0.25;
-export const CROSSFADE_MS = 150;
+export const CROSSFADE_MS: number = MOTION.fast;
 /** Today button: pages shown while hurrying back, and the time each one takes. */
 export const MAX_VISIBLE_STEPS = 5;
 export const STEP_MS = 100;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
-  import { reducedMotion } from '$lib/ui/motion';
+  import { MOTION, reducedMotion } from '$lib/ui/motion';
 
   type Props = {
     title: string;
@@ -40,9 +40,9 @@
     let dy = 0;
 
     const reset = () => {
-      el.style.transition = 'transform 200ms ease-out';
+      el.style.transition = 'transform var(--dur-base) var(--ease-out)';
       el.style.transform = '';
-      setTimeout(() => (el.style.transition = ''), 220);
+      setTimeout(() => (el.style.transition = ''), MOTION.base + 20);
     };
 
     const touchstart = (e: TouchEvent) => {

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount, setContext } from 'svelte';
+  import ErrorPage from '$components/ErrorPage.svelte';
   import NotepadStack from '$components/NotepadStack.svelte';
-  import SettingsSheet from '$components/SettingsSheet.svelte';
-  import StatsView from '$components/StatsView.svelte';
   import Toast from '$components/Toast.svelte';
   import type { DateKey } from '$lib/model/types';
   import { settings } from '$lib/settings/settings.svelte';
@@ -12,6 +11,7 @@
   import { inertWhen } from '$lib/ui/inert';
   import { nudge } from '$lib/ui/nudge.svelte';
   import { slideUp } from '$lib/ui/sheet';
+  import { sheetModules } from '$lib/ui/sheet-modules.svelte';
   import { sheets, type SheetName } from '$lib/ui/sheets.svelte';
   import { OPEN_SETTINGS, OPEN_STATS } from '$lib/ui/views';
 
@@ -23,6 +23,7 @@
   function openSheet(name: SheetName) {
     if (sheets.open) return;
     sheets.open = name;
+    void sheetModules.load(name);
     history.open(name, () => (sheets.open = null));
   }
   setContext(OPEN_STATS, () => openSheet('stats'));
@@ -55,6 +56,11 @@
 
   onMount(() => {
     nudge.evaluate(app.data);
+    // Once the first screen is up, fetch the sheets quietly so they open at once (and offline).
+    const idle = window.requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 1500));
+    idle(() => {
+      void sheetModules.loadAll();
+    });
     return history.init();
   });
 </script>
@@ -66,15 +72,27 @@
       use:inertWhen={sheets.open !== null}
       aria-hidden={sheets.open ? 'true' : undefined}
     >
-      <NotepadStack bind:this={notepad} {history} />
+      <svelte:boundary>
+        <NotepadStack bind:this={notepad} {history} />
+        {#snippet failed(error)}<ErrorPage {error} />{/snippet}
+      </svelte:boundary>
     </div>
     {#if sheets.open}
       <div class="sheet-host" transition:slideUp>
-        {#if sheets.open === 'stats'}
-          <StatsView onclose={closeSheet} onopen={openDay} />
-        {:else}
-          <SettingsSheet onclose={closeSheet} />
-        {/if}
+        <svelte:boundary>
+          {#if sheets.open === 'stats'}
+            {#if sheetModules.stats}
+              {@const Stats = sheetModules.stats}
+              <Stats onclose={closeSheet} onopen={openDay} />
+            {/if}
+          {:else}
+            {#if sheetModules.settings}
+              {@const Settings = sheetModules.settings}
+              <Settings onclose={closeSheet} />
+            {/if}
+          {/if}
+          {#snippet failed(error)}<ErrorPage {error} />{/snippet}
+        </svelte:boundary>
       </div>
     {/if}
   </div>

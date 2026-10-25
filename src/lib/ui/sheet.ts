@@ -1,8 +1,8 @@
 import { cubicOut } from 'svelte/easing';
-import { reducedMotion } from './motion';
+import { MOTION, reducedMotion } from './motion';
 
-export const SHEET_MS = 350;
-export const SHEET_FADE_MS = 150;
+export const SHEET_MS: number = MOTION.sheet;
+export const SHEET_FADE_MS: number = MOTION.fast;
 
 /** Svelte transition for a sheet that slides up over the page; a plain crossfade for reduced motion. */
 export function slideUp(node: Element) {

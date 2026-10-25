@@ -40,7 +40,7 @@
     box-shadow: var(--shadow-lift);
     font-size: 14px;
     pointer-events: auto;
-    animation: pop 160ms ease-out;
+    animation: pop var(--dur-fast) var(--ease-out);
   }
   button {
     min-height: var(--tap-target);

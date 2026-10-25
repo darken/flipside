@@ -6,6 +6,7 @@
   import { app } from '$lib/store/app.svelte';
   import { busy } from '$lib/ui/busy.svelte';
   import { gestures } from '$lib/ui/gesture';
+  import { haptic } from '$lib/ui/haptics';
   import { LayerHistory } from '$lib/ui/history';
   import { inertWhen } from '$lib/ui/inert';
   import { reducedMotion } from '$lib/ui/motion';
@@ -258,6 +259,7 @@
 
   /** Makes `key` the current page and settles everything. */
   async function land(key: DateKey, announce = true) {
+    haptic();
     currentKey = key;
     await tick();
     applyRest();

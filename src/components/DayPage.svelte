@@ -184,7 +184,7 @@
   }
   .count {
     display: inline-block;
-    animation: bump 320ms ease-out;
+    animation: bump 320ms var(--ease-out);
   }
   @keyframes bump {
     40% {

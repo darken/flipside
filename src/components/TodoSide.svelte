@@ -6,6 +6,7 @@
   import { app } from '$lib/store/app.svelte';
   import { busy } from '$lib/ui/busy.svelte';
   import { guarded } from '$lib/ui/guarded';
+  import { haptic } from '$lib/ui/haptics';
   import { motion, setLeaving, taskFade } from '$lib/ui/motion';
   import { toasts } from '$lib/ui/toast.svelte';
   import BackupNudge from './BackupNudge.svelte';
@@ -134,6 +135,7 @@
     const items = [...list.querySelectorAll<HTMLElement>('.slot:not(.leaving) > [data-task-id]')];
     const from = items.findIndex((el) => el.dataset.taskId === task.id);
     if (from < 0) return;
+    haptic();
     rects = items.map((el) => {
       const r = el.getBoundingClientRect();
       return { top: r.top - scrollerTop + scroller!.scrollTop, height: r.height };

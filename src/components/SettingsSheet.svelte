@@ -414,7 +414,7 @@
     height: 20px;
     border-radius: 50%;
     background: var(--accent);
-    transition: transform 150ms ease;
+    transition: transform var(--dur-fast) ease;
   }
   .switch input:checked {
     background: var(--accent);

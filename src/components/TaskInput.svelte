@@ -54,6 +54,7 @@
   <div></div>
   <div class="body">
     <textarea
+      dir="auto"
       bind:this={field}
       bind:value={text}
       use:autosize={text}
