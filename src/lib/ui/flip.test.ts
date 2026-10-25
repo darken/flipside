@@ -7,7 +7,6 @@ import {
   depth,
   durationFor,
   flipEase,
-  lockDirection,
   nearestRest,
   normalizeAngle,
   restAngle,
@@ -18,28 +17,6 @@ import {
   transformFor,
   type AutoFlipContext,
 } from './flip';
-
-describe('lockDirection', () => {
-  it('waits until the finger has moved about 10 px', () => {
-    expect(lockDirection(0, 0)).toBeNull();
-    expect(lockDirection(9, -9)).toBeNull();
-  });
-
-  it('locks to the dominant axis', () => {
-    expect(lockDirection(12, 3)).toBe('horizontal');
-    expect(lockDirection(-12, 3)).toBe('horizontal');
-    expect(lockDirection(3, 12)).toBe('vertical');
-    expect(lockDirection(-3, -40)).toBe('vertical');
-  });
-
-  it('treats a perfect diagonal as vertical, so scrolling wins', () => {
-    expect(lockDirection(15, 15)).toBe('vertical');
-  });
-
-  it('accepts a custom threshold', () => {
-    expect(lockDirection(5, 0, 4)).toBe('horizontal');
-  });
-});
 
 describe('angleFor', () => {
   it('maps the full width to 180 degrees', () => {

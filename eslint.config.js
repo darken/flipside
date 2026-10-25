@@ -26,6 +26,8 @@ export default ts.config(
   {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // TypeScript already reports undefined names, and knows the DOM types ESLint does not.
+      'no-undef': 'off',
     },
   },
   {

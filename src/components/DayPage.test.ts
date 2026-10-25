@@ -7,8 +7,20 @@ import { busy } from '$lib/ui/busy.svelte';
 import { NEW_DAY_MESSAGE } from '$lib/ui/guarded';
 import { toasts } from '$lib/ui/toast.svelte';
 import App from '../App.svelte';
+import { newPageMemory } from '$lib/ui/page-memory';
 import DayPage from './DayPage.svelte';
 
+const noNav = {
+  hasNewer: false,
+  hasOlder: false,
+  onNewer: () => {},
+  onOlder: () => {},
+  onToday: () => {},
+};
+/** Lets the notepad finish turning to a new page (animations are skipped in jsdom). */
+const settleStack = async () => {
+  for (let i = 0; i < 10; i++) await tick();
+};
 const T1 = '2026-10-25';
 const T2 = '2026-10-26';
 let dispose: () => void;
@@ -343,7 +355,7 @@ describe('read-only pages', () => {
 
   it('has no edit controls, and Copy to today only on unfinished one-offs', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1 });
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     expect(screen.queryByLabelText('New task')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
@@ -357,7 +369,7 @@ describe('read-only pages', () => {
 
   it('copies an unfinished task to today and leaves the old page alone', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1 });
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     await fireEvent.click(screen.getByRole('button', { name: 'Copy to today' }));
     expect(todoTexts()).toEqual(['Stretch', 'unfinished one-off']);
     expect(todoTasks(app.day(T1)!).map((t) => t.text)).toEqual(['unfinished one-off', 'Stretch']);
@@ -365,7 +377,7 @@ describe('read-only pages', () => {
 
   it('shows the done side without uncheck controls', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1 });
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     await fireEvent.click(screen.getByRole('button', { name: 'Show done list' }));
     expect(screen.getByText('1 done')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'finished' })).toBeDisabled();
@@ -384,6 +396,7 @@ describe('midnight', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Add task' }));
 
     expect(screen.getByText(NEW_DAY_MESSAGE)).toBeInTheDocument();
+    await settleStack();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Monday, October 26');
     expect(todoTexts()).toEqual(['Stretch']);
     expect(app.day(T1)!.tasks).toHaveLength(1);
@@ -488,7 +501,7 @@ describe('flipping', () => {
     expect(flipButton()).toHaveAttribute('aria-pressed', 'true');
     vi.setSystemTime(new Date(2026, 9, 26, 8, 0, 0));
     app.tick();
-    await tick();
+    await settleStack();
     expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
   });
 });

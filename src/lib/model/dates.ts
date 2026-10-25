@@ -82,3 +82,17 @@ export function formatTime(iso: string, locale?: string): string {
     new Date(iso),
   );
 }
+
+/** How long ago a page is, relative to today: "Yesterday", "3 days ago", "2 weeks ago". */
+export function formatRelative(key: DateKey, today: DateKey): string {
+  const days = daysBetween(key, today);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days === -1) return 'Tomorrow';
+  if (days < 0) return `In ${-days} days`;
+  const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+  if (days < 14) return plural(days, 'day');
+  if (days < 60) return plural(Math.floor(days / 7), 'week');
+  if (days < 365) return plural(Math.floor(days / 30), 'month');
+  return plural(Math.floor(days / 365), 'year');
+}

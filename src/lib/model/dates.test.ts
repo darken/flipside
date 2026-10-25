@@ -4,6 +4,7 @@ import {
   compareKeys,
   daysBetween,
   formatHeading,
+  formatRelative,
   formatTime,
   isPast,
   isValidKey,
@@ -173,5 +174,34 @@ describe('formatTime', () => {
 
   it('defaults to the runtime locale', () => {
     expect(formatTime('2026-10-25T18:32:00.000Z')).toContain('32');
+  });
+});
+
+describe('formatRelative', () => {
+  const today = '2026-10-25';
+
+  it('names today, yesterday and tomorrow', () => {
+    expect(formatRelative('2026-10-25', today)).toBe('Today');
+    expect(formatRelative('2026-10-24', today)).toBe('Yesterday');
+    expect(formatRelative('2026-10-26', today)).toBe('Tomorrow');
+  });
+
+  it('counts days, then weeks, months and years', () => {
+    expect(formatRelative('2026-10-22', today)).toBe('3 days ago');
+    expect(formatRelative('2026-10-12', today)).toBe('13 days ago');
+    expect(formatRelative('2026-10-11', today)).toBe('2 weeks ago');
+    expect(formatRelative('2026-09-27', today)).toBe('4 weeks ago');
+    expect(formatRelative('2026-08-25', today)).toBe('2 months ago');
+    expect(formatRelative('2025-10-25', today)).toBe('1 year ago');
+    expect(formatRelative('2023-10-25', today)).toBe('3 years ago');
+  });
+
+  it('copes with a date in the future', () => {
+    expect(formatRelative('2026-10-30', today)).toBe('In 5 days');
+  });
+
+  it('uses calendar days across a month and a leap day', () => {
+    expect(formatRelative('2026-09-30', '2026-10-02')).toBe('2 days ago');
+    expect(formatRelative('2024-02-28', '2024-03-01')).toBe('2 days ago');
   });
 });

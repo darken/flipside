@@ -1,20 +1,37 @@
 <script lang="ts">
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { doneTasks, todoTasks } from '$lib/model/tasks';
   import type { DateKey } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import { busy } from '$lib/ui/busy.svelte';
   import { AUTO_FLIP_DELAY_MS, shouldAutoFlip, type Side } from '$lib/ui/flip';
+  import type { PageMemory, PageNav } from '$lib/ui/page-memory';
   import DoneSide from './DoneSide.svelte';
   import Face from './Face.svelte';
   import FlipCard from './FlipCard.svelte';
   import TodoSide from './TodoSide.svelte';
 
-  let { key }: { key: DateKey } = $props();
+  type Props = {
+    key: DateKey;
+    /** What this page remembers while the stack keeps it off screen. */
+    memory: PageMemory;
+    /** The page on top: only it answers to keys and moves focus. */
+    active?: boolean;
+    nav: PageNav;
+    /** Days without a page between this page and the next newer one. */
+    skipped?: number;
+  };
+  let { key, memory, active = true, nav, skipped = 0 }: Props = $props();
 
   // Each page remembers its own side, in memory only: it opens on the to-do side.
-  let side = $state<Side>('todo');
-  let autoFlipped = $state(false);
+  // svelte-ignore state_referenced_locally
+  let side = $state<Side>(memory.side);
+  // svelte-ignore state_referenced_locally
+  let autoFlipped = $state(memory.autoFlipped);
+  $effect(() => {
+    memory.side = side;
+    memory.autoFlipped = autoFlipped;
+  });
   let announcement = $state('');
   let root: HTMLDivElement | undefined = $state();
   let autoFlipTimer: ReturnType<typeof setTimeout> | undefined;
@@ -24,20 +41,13 @@
   const todoCount = $derived(todoTasks(day).length);
   const doneCount = $derived(doneTasks(day).length);
 
-  // After midnight the new day starts on the front.
-  let lastKey = untrack(() => key);
-  $effect(() => {
-    if (key === lastKey) return;
-    lastKey = key;
-    side = 'todo';
-    autoFlipped = false;
-  });
-
   const taskWord = (n: number) => `${n} ${n === 1 ? 'task' : 'tasks'}`;
 
   function onFlipped(shown: Side) {
     announcement = `${shown === 'done' ? 'Done list' : 'To do list'}, ${taskWord(shown === 'done' ? doneCount : todoCount)}`;
-    root?.querySelector<HTMLElement>(`[data-face="${shown}"] h1`)?.focus({ preventScroll: true });
+    if (active) {
+      root?.querySelector<HTMLElement>(`[data-face="${shown}"] h1`)?.focus({ preventScroll: true });
+    }
   }
 
   /** TodoSide reports a task being checked off; the last one turns the page after a pause. */
@@ -66,6 +76,7 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
+    if (!active) return;
     if (event.key.toLowerCase() !== 'f' || event.metaKey || event.ctrlKey || event.altKey) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable]')) return;
@@ -80,12 +91,28 @@
 <div class="root" bind:this={root}>
   <FlipCard {side} onSideChange={(next) => (side = next)} {onFlipped} disabled={busy.active}>
     {#snippet front()}
-      <Face {key} caption="To do">
+      <Face
+        {key}
+        caption="To do"
+        readOnly={!editable}
+        {nav}
+        {skipped}
+        scrollTop={memory.scroll.todo}
+        onScroll={(top) => (memory.scroll.todo = top)}
+      >
         <TodoSide {key} {editable} {onCheckedOff} />
       </Face>
     {/snippet}
     {#snippet back()}
-      <Face {key} caption="Done">
+      <Face
+        {key}
+        caption="Done"
+        readOnly={!editable}
+        {nav}
+        {skipped}
+        scrollTop={memory.scroll.done}
+        onScroll={(top) => (memory.scroll.done = top)}
+      >
         <DoneSide {key} {editable} stamp={autoFlipped && todoCount === 0} />
       </Face>
     {/snippet}
@@ -114,8 +141,7 @@
   .root {
     position: relative;
     width: 100%;
-    max-width: var(--page-max-width);
-    height: var(--page-height);
+    height: 100%;
   }
 
   /* A turned-up corner at the bottom right of the page */
@@ -161,13 +187,6 @@
   @keyframes bump {
     40% {
       transform: scale(1.5);
-    }
-  }
-
-  @media (min-width: 520px) {
-    .root {
-      height: calc(var(--page-height) - 2 * var(--space-5));
-      margin-block: var(--space-5);
     }
   }
 </style>

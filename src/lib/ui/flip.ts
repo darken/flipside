@@ -3,8 +3,6 @@ export type Side = 'todo' | 'done';
 export const FLIP_MS = 600;
 export const FLIP_EASING = [0.2, 0.7, 0.2, 1] as const;
 export const CROSSFADE_MS = 150;
-/** Movement before a gesture is locked as horizontal or vertical. */
-export const LOCK_PX = 10;
 /** A swipe faster than this finishes the flip even if it is short. */
 export const FLING_PX_PER_MS = 0.5;
 /** Swipes starting this close to a screen edge are left to the browser's back gesture. */
@@ -21,15 +19,6 @@ export const MAX_SHADE = 0.4;
 /** Card angle at rest: the front (to do) is 0°, the back (done) is 180°. */
 export function restAngle(side: Side): number {
   return side === 'todo' ? 0 : 180;
-}
-
-export function lockDirection(
-  dx: number,
-  dy: number,
-  threshold: number = LOCK_PX,
-): 'horizontal' | 'vertical' | null {
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < threshold) return null;
-  return Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
 }
 
 /** How far the card has turned for a horizontal drag of `dx` across `width` pixels. */

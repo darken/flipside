@@ -7,7 +7,6 @@
     depth,
     durationFor,
     flipEase,
-    lockDirection,
     nearestRest,
     normalizeAngle,
     restAngle,
@@ -17,6 +16,8 @@
     transformFor,
     type Side,
   } from '$lib/ui/flip';
+  import { gestures, lockDirection } from '$lib/ui/gesture';
+  import { inertWhen } from '$lib/ui/inert';
   import { reducedMotion } from '$lib/ui/motion';
 
   type Props = {
@@ -59,16 +60,6 @@
   let run: Run | null = null;
   let gesture: Gesture | null = null;
 
-  /** The `inert` attribute, set by hand so it also works where the DOM property is missing. */
-  function inertWhen(node: HTMLElement, hidden: boolean) {
-    node.toggleAttribute('inert', hidden);
-    return {
-      update(next: boolean) {
-        node.toggleAttribute('inert', next);
-      },
-    };
-  }
-
   const other = (s: Side): Side => (s === 'todo' ? 'done' : 'todo');
 
   function apply(a: number) {
@@ -106,6 +97,7 @@
 
   function finish(to: number, notify: boolean) {
     stopRun();
+    gestures.release('flip');
     angle = normalizeAngle(to);
     apply(angle);
     if (notify) onFlipped?.(shown);
@@ -114,6 +106,7 @@
   /** Animates the card from one angle to another using only compositor properties. */
   function play(from: number, to: number, notify = true) {
     stopRun();
+    gestures.claim('flip'); // a peel must not start while the page is turning
     angle = to;
     apply(to); // final pose is the inline style, so nothing flashes when the animation ends
     const parts = [
@@ -179,6 +172,7 @@
 
   function onPointerDown(e: PointerEvent) {
     if (disabled || run || gesture || !e.isPrimary || e.button !== 0) return;
+    if (gestures.owner !== null) return; // a peel is under way
     if (e.pointerType === 'mouse') return; // mouse users have the button and the F key
     const target = e.target as Element;
     if (target.closest('textarea, input:not([type="checkbox"]), [data-handle]')) return;
@@ -201,6 +195,10 @@
       g.lock = lockDirection(e.clientX - g.x0, e.clientY - g.y0);
       if (g.lock === 'vertical') gesture = null; // the face scrolls
       if (g.lock !== 'horizontal') return;
+      if (!gestures.claim('flip')) {
+        gesture = null;
+        return;
+      }
       g.x0 = e.clientX; // start turning from here, so the card does not jump
       g.samples = [{ x: e.clientX, t: e.timeStamp }];
       try {
@@ -220,6 +218,7 @@
     const g = gesture;
     gesture = null;
     if (!g || g.lock !== 'horizontal' || e.pointerId !== g.id) return;
+    gestures.release('flip');
     const turned = angleFor(e.clientX - g.x0, g.width);
     if (shouldFinish(turned, velocity(g))) {
       const direction = Math.sign(turned) || Math.sign(velocity(g)) || -1;
@@ -234,7 +233,9 @@
   function cancelGesture() {
     const g = gesture;
     gesture = null;
-    if (g?.lock === 'horizontal' && !flat) play(angle, g.base, false);
+    if (g?.lock !== 'horizontal') return;
+    gestures.release('flip');
+    if (!flat) play(angle, g.base, false);
   }
 
   // ---- Reactions to props --------------------------------------------------------------------
@@ -264,7 +265,10 @@
     return () => query.removeEventListener?.('change', update);
   });
 
-  $effect(() => () => stopRun());
+  $effect(() => () => {
+    stopRun();
+    gestures.release('flip');
+  });
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->

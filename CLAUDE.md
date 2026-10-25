@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page) and 4 (flip) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page), 4 (flip) and 5 (notepad stack) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -45,7 +45,7 @@ tests/
 src/
   lib/
     model/types.ts          # Task, Day, Routine, AppData
-    model/dates.ts          # local-date helpers (YYYY-MM-DD), formatHeading, isPast
+    model/dates.ts          # local-date helpers (YYYY-MM-DD), formatHeading, formatRelative, isPast
     model/tasks.ts          # pure task ops on a Day (add, edit, move, copyToToday), selectors
     store/app.svelte.ts     # AppStore ($state), exported as `app`; rollover, cross-tab sync
     store/guard.ts          # assertEditable / ReadOnlyDayError
@@ -54,13 +54,19 @@ src/
     store/validate.ts       # parseAppData: hand-written validation, reused by import
     ui/toast.svelte.ts      # toast queue (`toasts`), shown by Toast.svelte
     ui/guarded.ts           # guarded(): turns ReadOnlyDayError into a toast
+    ui/gesture.ts           # direction locking + GestureArbiter: a swipe flips or peels, never both
+    ui/peel.ts              # pure peel maths: dead zone, progress, commit, momentum guard, neighbours(), skippedBetween()
+    ui/peelGesture.ts       # touch/pointer/wheel controller that turns a pull at the end of a list into a peel
+    ui/history.ts           # LayerHistory: one browser-history entry per layer (past pages now; Stats/Settings later)
+    ui/page-memory.ts       # what a page remembers while off screen (side, scroll), and the PageNav type
+    ui/inert.ts, ui/portal.ts   # `inert` attribute action; move an element to <body>
     ui/flip.ts              # pure flip maths (angles, swipe rules, easing) and shouldAutoFlip
     ui/busy.svelte.ts       # lock held during drag/edit/menu so the page cannot flip
     ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
     store/backup.ts         # JSON export/import (Phase 7)
     stats/compute.ts        # pure stats functions
   components/
-    NotepadStack.svelte     # day pages stack, scroll-driven peel
+    NotepadStack.svelte     # the stack of day pages: peel, Today, goTo(key), history, rollover
     DayPage.svelte          # one day: FlipCard + flip button + auto-flip; owns the page's `side`
     FlipCard.svelte         # two-sided 3D card: flip animation and swipe gesture
     Face.svelte             # one side of the page: date header + the scrolling, ruled body
@@ -115,10 +121,19 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 - **Auto-flip:** checking off the last open task on today's page (todo 1 → 0) turns the page to the done side after 400 ms, once per page, and shows the "All done ✓" stamp. It never happens after deleting or copying, on past pages, while something holds `busy`, or when already on the back (`shouldAutoFlip` in `flip.ts`). `AUTO_FLIP_ENABLED` becomes the "Auto-flip when done" setting in Phase 7.
 - **Side state:** `DayPage` keeps its `side` in memory only; every page opens on the to-do side, and a new day starts on the front.
 - **Dialogs and fixed elements inside a face are trapped** by the transformed ancestor (`position: fixed` is then relative to the card). `TaskMenu` therefore moves itself to `<body>` with the `portal` action.
-- **Day stack:** vertical scroll-snap. The current page moves up (translateY, a slight rotateX, a shadow) to reveal the previous day. Use `animation-timeline: scroll()` where supported, with a requestAnimationFrame fallback. Only about 3 pages near the screen are rendered at a time.
+- **Day stack (`NotepadStack`):** a custom peel gesture, not scroll-snap. Pulling past the end of the visible list lifts the current page up and away (`translateY` to -100%, `rotateX` up to 12° from the top edge, a growing shadow) to reveal the older page, which scales 0.96 → 1 as its dark overlay fades; pulling down at the top brings the newer page back down. About 450 ms with the flip's curve. Only `transform` and `opacity` animate; `will-change` is set only during a peel.
+- **Three pages only:** the newer page waiting above, the current page, the older page below (`neighbours()` over `app.dayKeys`, saved days only). Each is a `DayPage` inside a `.sheet` wrapper; the peel transform is on the wrapper, outside `FlipCard`, so the two 3D effects do not interfere. Pages that are not on top are `inert` and `aria-hidden`. `PageMemory` (side, scroll positions, auto-flipped) lives in the stack so pages remember themselves while unmounted.
+- **Peel hand-off rules:** the list must be at its end (bottom for older, top for newer, or fit on screen) _when the finger touches down_ (momentum guard: a list that merely reaches its end during the same touch or by momentum needs a new touch); then a vertical drag; the page only follows after a 24 px dead zone; it completes past 35 % or on a pull faster than 0.5 px/ms, otherwise it springs back. Touch uses `touchstart`/non-passive `touchmove` (the stage has `touch-action: pan-y`, so the browser cancels pointer events when it scrolls) and calls `preventDefault()` only once the peel owns the gesture; mouse and pen use Pointer Events. A swipe may start on the new-task field unless it is focused. At the ends of the stack the page stretches with resistance ("This is your first page" on the oldest page).
+- **One gesture at a time:** `gestures` (`gesture.ts`) lets a swipe either flip (horizontal) or peel (vertical); whoever locks first owns it. A running flip or peel, and anything holding `busy`, blocks the other.
+- **Other ways to turn:** "‹ Newer" / "Older ›" buttons in each page header (also for screen readers), Alt+↓ (older) / Alt+↑ (newer), and a wheel or trackpad event of about 120 px at the end of a list after a 200 ms pause (one page per burst). The Today button (past pages only) animates back through at most 5 newer pages, ~100 ms each; any more are skipped instantly. `goTo(key)` (exported by `NotepadStack`) jumps to a day, or the nearest day that has a page. **Phase 6:** heatmap cells call `goTo`. **Phase 8 (optional):** a calendar sheet from the date header.
+- **Past pages:** read-only (`editable=false`), softer ink (`--ink-past`), a lock icon, "Yesterday" / "3 days ago" in the header, and "Copy to today" on unfinished one-off tasks. Missed days have no page and are skipped; the page below a gap shows "2 days skipped" at the top of its list.
+- **Back button (`LayerHistory`):** one history entry per layer, however many pages you peel; Back closes the top layer. Peeling away from today opens the `past` layer; Back on a past page animates to today; Today or peeling back to today removes the entry with `history.back()`; Back on today leaves the app. A reload opens on today and clears any leftover entry. Stats (Phase 6), Settings (Phase 7) and the task menu can be added as further layers.
+- **New day while open:** on today, the new day lays down on top, the old today becomes the read-only page below, and a toast says "It's a new day". On a past page nothing moves; Today and Back lead to the new day.
+- **After a peel:** focus moves to the new page's date heading and an `aria-live` message reads "Friday, October 24 · Yesterday · read-only" (plus "2 days skipped").
 - Animate only `transform` and `opacity`. Aim for 60 fps on mid-range phones.
 - With `prefers-reduced-motion` on, the flip becomes a 150 ms crossfade (no 3D, no tilt; swipes still switch sides but nothing follows the finger) and the peel becomes a plain scroll. The crossfade uses WAAPI because the global reduced-motion CSS zeroes CSS transitions.
 - The flip button (turned corner, bottom right) has `aria-label` "Show done list" / "Show to-do list", `aria-pressed` and shows the other side's count; the count bumps when it changes.
+- Header on every face: date line (with Stats and Settings) and a caption line (side · how long ago · lock) with the page buttons. Long dates shrink with `clamp()`.
 - Colours, spacing and shadows come from `tokens.css`, with light (paper) and dark themes.
 
 ## Today page interactions
