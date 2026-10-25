@@ -31,10 +31,12 @@ test('a 3-line task survives a reload', async ({ page }) => {
 test('completing a task moves it to the done side', async ({ page }) => {
   await page.goto('/');
   await add(page, 'Pay rent');
+  await add(page, 'Water plants'); // a second task, so finishing the first does not turn the page
   await page.getByRole('checkbox', { name: 'Pay rent' }).check();
-  await expect(page.getByRole('button', { name: 'Done (1)' })).toBeVisible();
+  const flip = page.getByRole('button', { name: 'Show done list' });
+  await expect(flip).toContainText('Done (1)');
 
-  await page.getByRole('button', { name: 'Done (1)' }).click();
+  await flip.click();
   await expect(page.getByText('1 done today')).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Pay rent' })).toBeChecked();
 

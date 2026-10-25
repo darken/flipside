@@ -3,6 +3,7 @@
   import type { DateKey, Task } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import { autosize } from '$lib/ui/autosize';
+  import { busy } from '$lib/ui/busy.svelte';
   import { guarded } from '$lib/ui/guarded';
   import { setLeaving } from '$lib/ui/motion';
 
@@ -18,6 +19,8 @@
     onMenu?: (task: Task, opener: HTMLElement) => void;
     onDragStart?: (task: Task, clientY: number) => void;
     onHandleKey?: (task: Task, event: KeyboardEvent) => void;
+    /** Called after a successful check or uncheck, with the new state. */
+    onToggled?: (done: boolean) => void;
   };
 
   let {
@@ -31,6 +34,7 @@
     onMenu,
     onDragStart,
     onHandleKey,
+    onToggled,
   }: Props = $props();
 
   const LONG_PRESS_MS = 300;
@@ -44,12 +48,17 @@
   let draft = $state('');
   let finished = false;
 
+  // A page flip must not interrupt typing.
+  $effect(() => (editing ? busy.hold() : undefined));
+
   function toggle(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     setLeaving(done ? 'removed' : 'done');
     guarded(() => app.toggleDone(key, task.id));
     // If the change was refused the box must show what is really stored.
-    input.checked = app.day(key)?.tasks.find((t) => t.id === task.id)?.doneAt !== undefined;
+    const nowDone = app.day(key)?.tasks.find((t) => t.id === task.id)?.doneAt !== undefined;
+    input.checked = nowDone;
+    if (nowDone !== done) onToggled?.(nowDone);
   }
 
   function startEdit() {

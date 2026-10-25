@@ -38,6 +38,7 @@
   /* Layout */
   --page-max-width: 480px;
   --tap-target: 44px;
+  --page-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 
   /* Fonts */
   --font-hand: 'Caveat', 'Patrick Hand', 'Segoe Print', 'Bradley Hand', cursive;

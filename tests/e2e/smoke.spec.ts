@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('loads and shows the paper sheet with a date header', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('Flipside');
-  const sheet = page.locator('.paper');
+  const sheet = page.locator('[data-face="todo"] .paper');
   await expect(sheet).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).not.toBeEmpty();
   await expect(page.getByRole('button', { name: 'Stats' })).toBeVisible();

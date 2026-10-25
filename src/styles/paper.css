@@ -36,13 +36,21 @@ p {
   margin: 0;
 }
 
-/* Paper sheet: ruled lines, margin line, binding strip, soft shadow, noise */
+/*
+ * Paper sheet: colour, binding strip, soft shadow and grain. No `overflow: hidden` here or on
+ * anything above a flipping card: it flattens the 3D context and breaks the flip on iOS Safari.
+ */
 .paper {
   --binding-height: 28px;
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   background-color: var(--paper-cream);
+  box-shadow: var(--shadow-paper);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+/* Ruled lines and the margin line. `local` makes them scroll with the content they sit under. */
+.ruled {
   background-image:
     linear-gradient(
       to right,
@@ -58,11 +66,7 @@ p {
       var(--ruled-line) calc(var(--line-height) - 1px),
       var(--ruled-line) var(--line-height)
     );
-  background-position:
-    0 0,
-    0 var(--binding-height);
-  box-shadow: var(--shadow-paper);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background-attachment: local;
 }
 
 /* Paper grain, drawn by an inlined feTurbulence filter (well under 20 KB) */

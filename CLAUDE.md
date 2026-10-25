@@ -4,7 +4,7 @@ A mobile-first daily todo app. Each day is a page of a vertical notepad: the fro
 
 It is a frontend-only single-page app with no backend. All data lives in `localStorage` and can be downloaded or imported as a JSON backup.
 
-> Status: Phases 1 (scaffold), 2 (data layer) and 3 (today page) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
+> Status: Phases 1 (scaffold), 2 (data layer), 3 (today page) and 4 (flip) are done. Build the remaining phases in the order below, and update this file when commands or structure change.
 
 ## Stack
 
@@ -54,12 +54,16 @@ src/
     store/validate.ts       # parseAppData: hand-written validation, reused by import
     ui/toast.svelte.ts      # toast queue (`toasts`), shown by Toast.svelte
     ui/guarded.ts           # guarded(): turns ReadOnlyDayError into a toast
+    ui/flip.ts              # pure flip maths (angles, swipe rules, easing) and shouldAutoFlip
+    ui/busy.svelte.ts       # lock held during drag/edit/menu so the page cannot flip
     ui/motion.ts, ui/autosize.ts   # reduced-motion helpers, task fade, textarea autosize
     store/backup.ts         # JSON export/import (Phase 7)
     stats/compute.ts        # pure stats functions
   components/
     NotepadStack.svelte     # day pages stack, scroll-driven peel
-    DayPage.svelte          # two-sided flip card
+    DayPage.svelte          # one day: FlipCard + flip button + auto-flip; owns the page's `side`
+    FlipCard.svelte         # two-sided 3D card: flip animation and swipe gesture
+    Face.svelte             # one side of the page: date header + the scrolling, ruled body
     TodoSide.svelte, DoneSide.svelte, TaskItem.svelte, TaskInput.svelte, TaskMenu.svelte, Toast.svelte
     StatsView.svelte, charts/BarChart.svelte, charts/Heatmap.svelte
     SettingsSheet.svelte
@@ -104,11 +108,17 @@ type AppData = { version: 1; days: Record<string, Day>; routines: Routine[] };
 ## UI and animation
 
 - Mobile first: design at 375px width, with 44px minimum tap targets and safe-area insets (`env(safe-area-inset-*)`).
-- **Flip:** `transform-style: preserve-3d` and `rotateY(180deg)` with `backface-visibility: hidden`. Add the `-webkit-` prefix for iOS Safari and keep each face on its own layer. Triggered by a horizontal swipe (pointer events) or a button.
+- **One-screen pages:** a page is exactly one screen (`--page-height`: `100dvh` minus the safe areas). The document never scrolls; each _face_ scrolls inside itself (`.scroll`: `overflow-y: auto`, `overscroll-behavior: contain`, ruled lines with `background-attachment: local`), so the 3D layer stays one screen tall and each face remembers its own scroll position. Absolutely positioned bits inside a face need the scroller to be `position: relative`, or they escape its clip and make the document scroll. **Phase 5 design point:** one page is one screen in the stack; pulling up from the bottom of a list hands off to the peel there.
+- **Flip (`FlipCard`):** `perspective: 1400px` on the stage, `transform-style: preserve-3d` on the card, two faces in one grid cell, the back at `rotateY(180deg)`, `backface-visibility: hidden` with the `-webkit-` prefix and `translateZ(0)` on each face. Both faces stay mounted; the hidden one gets `inert` (set as an attribute) and `aria-hidden`. **Never put `overflow: hidden` (or any non-`visible` overflow) on the stage, the card or anything above them, and not on `.paper`: it flattens the 3D context and breaks the flip on iOS Safari.** `will-change: transform` is set only while a flip runs.
+- **Flip motion:** Web Animations API on `transform` and `opacity` only, so it can be cancelled or reversed part way. About 600 ms, `cubic-bezier(0.2, 0.7, 0.2, 1)` (sampled into keyframes by `flip.ts`), around the vertical centre line, with scale 0.96 and a 4° `rotateX` tilt at the midpoint, a shade overlay on each face and a glow layer for the shadow. The button always turns the page right to left; a swipe turns it the way the finger goes. When it finishes, focus moves to the new face's `h1` and an `aria-live` region says "Done list, 5 tasks".
+- **Swipe to flip:** touch and pen only (mouse users have the button and the **F** key; F is ignored while typing or when a modifier is held). After about 10 px the gesture locks to horizontal or vertical; vertical is left to the face's scrolling (`touch-action: pan-y` on the stage, the faces and the scrollers). The angle follows the finger (`dx / width × 180°`); on release it finishes past 90° or on a fling faster than 0.5 px/ms in the drag's direction, otherwise it springs back. A swipe does not start in a text field, on a drag handle, within 20 px of a screen edge, or while `busy` is held (drag, edit, open menu). Swipes during a running flip are ignored; the button and F reverse it.
+- **Auto-flip:** checking off the last open task on today's page (todo 1 → 0) turns the page to the done side after 400 ms, once per page, and shows the "All done ✓" stamp. It never happens after deleting or copying, on past pages, while something holds `busy`, or when already on the back (`shouldAutoFlip` in `flip.ts`). `AUTO_FLIP_ENABLED` becomes the "Auto-flip when done" setting in Phase 7.
+- **Side state:** `DayPage` keeps its `side` in memory only; every page opens on the to-do side, and a new day starts on the front.
+- **Dialogs and fixed elements inside a face are trapped** by the transformed ancestor (`position: fixed` is then relative to the card). `TaskMenu` therefore moves itself to `<body>` with the `portal` action.
 - **Day stack:** vertical scroll-snap. The current page moves up (translateY, a slight rotateX, a shadow) to reveal the previous day. Use `animation-timeline: scroll()` where supported, with a requestAnimationFrame fallback. Only about 3 pages near the screen are rendered at a time.
 - Animate only `transform` and `opacity`. Aim for 60 fps on mid-range phones.
-- With `prefers-reduced-motion` on, the flip becomes a crossfade and the peel becomes a plain scroll.
-- The flip button has an accessible label and the hidden face is `inert`.
+- With `prefers-reduced-motion` on, the flip becomes a 150 ms crossfade (no 3D, no tilt; swipes still switch sides but nothing follows the finger) and the peel becomes a plain scroll. The crossfade uses WAAPI because the global reduced-motion CSS zeroes CSS transitions.
+- The flip button (turned corner, bottom right) has `aria-label` "Show done list" / "Show to-do list", `aria-pressed` and shows the other side's count; the count bumps when it changes.
 - Colours, spacing and shadows come from `tokens.css`, with light (paper) and dark themes.
 
 ## Today page interactions

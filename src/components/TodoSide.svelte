@@ -4,6 +4,7 @@
   import { todoTasks } from '$lib/model/tasks';
   import type { DateKey, Task } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
+  import { busy } from '$lib/ui/busy.svelte';
   import { guarded } from '$lib/ui/guarded';
   import { motion, setLeaving, taskFade } from '$lib/ui/motion';
   import { toasts } from '$lib/ui/toast.svelte';
@@ -11,7 +12,13 @@
   import TaskItem from './TaskItem.svelte';
   import TaskMenu from './TaskMenu.svelte';
 
-  let { key, editable }: { key: DateKey; editable: boolean } = $props();
+  type Props = {
+    key: DateKey;
+    editable: boolean;
+    /** A task was checked off: how many were open before and after. */
+    onCheckedOff?: (before: number, after: number) => void;
+  };
+  let { key, editable, onCheckedOff }: Props = $props();
 
   type Drag = { id: string; from: number; to: number; dy: number; height: number };
 
@@ -23,6 +30,13 @@
   let drag = $state<Drag | null>(null);
   let grabbedId = $state<string | null>(null);
   let announcement = $state('');
+
+  // A page flip must not interrupt an open menu.
+  $effect(() => (menu ? busy.hold() : undefined));
+
+  function toggled(done: boolean) {
+    if (done) onCheckedOff?.(todo.length + 1, todo.length);
+  }
 
   const menuIndex = $derived(menu ? todo.findIndex((t) => t.id === menu!.task.id) : -1);
 
@@ -98,23 +112,33 @@
 
   const EDGE_PX = 64;
   const MAX_SCROLL_PX = 14;
+  // Positions are measured in the scrolling face's own content coordinates.
+  let scroller: HTMLElement | null = null;
+  let scrollerTop = 0;
+  let scrollerBottom = 0;
   let rects: { top: number; height: number }[] = [];
-  let startPageY = 0;
+  let startContentY = 0;
   let lastClientY = 0;
   let frame = 0;
+  let releaseBusy: (() => void) | undefined;
 
   const preventTouchScroll = (e: TouchEvent) => e.preventDefault();
 
   function startDrag(task: Task, clientY: number) {
-    if (!list || drag) return;
+    scroller = list?.closest<HTMLElement>('.scroll') ?? null;
+    if (!list || !scroller || drag) return;
+    const bounds = scroller.getBoundingClientRect();
+    scrollerTop = bounds.top;
+    scrollerBottom = bounds.bottom;
     const items = [...list.querySelectorAll<HTMLElement>('.slot:not(.leaving) > [data-task-id]')];
     const from = items.findIndex((el) => el.dataset.taskId === task.id);
     if (from < 0) return;
     rects = items.map((el) => {
       const r = el.getBoundingClientRect();
-      return { top: r.top + window.scrollY, height: r.height };
+      return { top: r.top - scrollerTop + scroller!.scrollTop, height: r.height };
     });
-    startPageY = clientY + window.scrollY;
+    startContentY = clientY - scrollerTop + scroller.scrollTop;
+    releaseBusy = busy.hold();
     lastClientY = clientY;
     drag = { id: task.id, from, to: from, dy: 0, height: rects[from]!.height };
     window.addEventListener('pointermove', onPointerMove);
@@ -130,7 +154,10 @@
     const last = rects[rects.length - 1]!;
     const min = rects[0]!.top - mine.top;
     const max = last.top + last.height - mine.height - mine.top;
-    const dy = Math.max(min, Math.min(max, lastClientY + window.scrollY - startPageY));
+    const dy = Math.max(
+      min,
+      Math.min(max, lastClientY - scrollerTop + scroller!.scrollTop - startContentY),
+    );
     const center = mine.top + mine.height / 2 + dy;
     // Dragged all the way down, the centres line up exactly: that still counts as passing.
     let to = 0;
@@ -149,12 +176,12 @@
   function autoscroll() {
     if (!drag) return;
     let speed = 0;
-    if (lastClientY < EDGE_PX) speed = -((EDGE_PX - lastClientY) / EDGE_PX) * MAX_SCROLL_PX;
-    else if (lastClientY > innerHeight - EDGE_PX) {
-      speed = ((lastClientY - (innerHeight - EDGE_PX)) / EDGE_PX) * MAX_SCROLL_PX;
-    }
+    const fromTop = lastClientY - scrollerTop;
+    const fromBottom = scrollerBottom - lastClientY;
+    if (fromTop < EDGE_PX) speed = -((EDGE_PX - fromTop) / EDGE_PX) * MAX_SCROLL_PX;
+    else if (fromBottom < EDGE_PX) speed = ((EDGE_PX - fromBottom) / EDGE_PX) * MAX_SCROLL_PX;
     if (speed) {
-      window.scrollBy(0, speed);
+      scroller!.scrollBy(0, speed);
       updateDrag();
     }
     frame = requestAnimationFrame(autoscroll);
@@ -178,6 +205,8 @@
     cancelAnimationFrame(frame);
     const finished = drag;
     drag = null;
+    releaseBusy?.();
+    releaseBusy = undefined;
     swallowNextClick();
     if (commit && finished && finished.to !== finished.from) {
       guarded(() => app.move(key, finished.id, finished.to));
@@ -219,6 +248,7 @@
           onMenu={(t, opener) => (menu = { task: t, opener })}
           onDragStart={startDrag}
           {onHandleKey}
+          onToggled={toggled}
         />
       </li>
     {/each}
@@ -246,7 +276,7 @@
 
 <style>
   .side {
-    padding-bottom: calc(var(--line-height) * 3);
+    padding-bottom: calc(var(--line-height) * 3); /* clear of the flip button */
   }
   .list {
     margin: 0;

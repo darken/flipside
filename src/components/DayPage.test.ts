@@ -3,6 +3,7 @@ import { tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { doneTasks, todoTasks } from '$lib/model/tasks';
 import { app } from '$lib/store/app.svelte';
+import { busy } from '$lib/ui/busy.svelte';
 import { NEW_DAY_MESSAGE } from '$lib/ui/guarded';
 import { toasts } from '$lib/ui/toast.svelte';
 import App from '../App.svelte';
@@ -37,6 +38,7 @@ beforeEach(() => {
 
 afterEach(() => {
   toasts.clear();
+  busy.reset();
   dispose();
   vi.useRealTimers();
 });
@@ -175,9 +177,9 @@ describe('checking off', () => {
     await fireEvent.click(box);
     expect(todoTasks(app.todayDay)).toEqual([]);
     expect(doneTasks(app.todayDay).map((t) => t.text)).toEqual(['buy milk']);
-    expect(screen.getByRole('button', { name: 'Done (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show done list' })).toHaveTextContent('Done (1)');
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Done (1)' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Show done list' }));
     expect(screen.getByText('1 done today')).toBeInTheDocument();
     const doneBox = screen.getByRole('checkbox', { name: 'buy milk' });
     expect(doneBox).toBeChecked();
@@ -187,7 +189,7 @@ describe('checking off', () => {
     expect(todoTexts()).toEqual(['buy milk']);
     expect(screen.getByText('Nothing done yet')).toBeInTheDocument();
 
-    await fireEvent.click(screen.getByRole('button', { name: 'To do' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Show to-do list' }));
     expect(screen.getByRole('checkbox', { name: 'buy milk' })).not.toBeChecked();
   });
 
@@ -341,7 +343,7 @@ describe('read-only pages', () => {
 
   it('has no edit controls, and Copy to today only on unfinished one-offs', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1, side: 'todo', onSideChange: () => {} });
+    render(DayPage, { key: T1 });
     expect(screen.queryByLabelText('New task')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
@@ -355,15 +357,16 @@ describe('read-only pages', () => {
 
   it('copies an unfinished task to today and leaves the old page alone', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1, side: 'todo', onSideChange: () => {} });
+    render(DayPage, { key: T1 });
     await fireEvent.click(screen.getByRole('button', { name: 'Copy to today' }));
     expect(todoTexts()).toEqual(['Stretch', 'unfinished one-off']);
     expect(todoTasks(app.day(T1)!).map((t) => t.text)).toEqual(['unfinished one-off', 'Stretch']);
   });
 
-  it('shows the done side without uncheck controls', () => {
+  it('shows the done side without uncheck controls', async () => {
     yesterdayPage();
-    render(DayPage, { key: T1, side: 'done', onSideChange: () => {} });
+    render(DayPage, { key: T1 });
+    await fireEvent.click(screen.getByRole('button', { name: 'Show done list' }));
     expect(screen.getByText('1 done')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'finished' })).toBeDisabled();
   });
@@ -385,5 +388,180 @@ describe('midnight', () => {
     expect(todoTexts()).toEqual(['Stretch']);
     expect(app.day(T1)!.tasks).toHaveLength(1);
     expect(app.today).toBe(T2);
+  });
+});
+
+describe('flipping', () => {
+  const face = (name: 'todo' | 'done') => document.querySelector(`[data-face="${name}"]`)!;
+  const flipButton = () => screen.getByRole('button', { name: /^Show (done|to-do) list$/ });
+
+  it('turns the page with the flip button and labels it for the other side', async () => {
+    app.add(T1, 'a');
+    render(App);
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+    expect(flipButton()).toHaveAccessibleName('Show done list');
+    expect(flipButton()).toHaveTextContent('Done (0)');
+
+    await fireEvent.click(flipButton());
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'true');
+    expect(flipButton()).toHaveAccessibleName('Show to-do list');
+    expect(flipButton()).toHaveTextContent('To do (1)');
+    expect(face('done')).not.toHaveAttribute('inert');
+
+    await fireEvent.click(flipButton());
+    expect(flipButton()).toHaveTextContent('Done (0)');
+  });
+
+  it('hides the face that is turned away from keyboards and screen readers', async () => {
+    render(App);
+    expect(face('done')).toHaveAttribute('inert');
+    expect(face('done')).toHaveAttribute('aria-hidden', 'true');
+    expect(face('todo')).not.toHaveAttribute('inert');
+    expect(face('todo')).not.toHaveAttribute('aria-hidden');
+
+    await fireEvent.click(flipButton());
+    expect(face('todo')).toHaveAttribute('inert');
+    expect(face('todo')).toHaveAttribute('aria-hidden', 'true');
+    expect(face('done')).not.toHaveAttribute('inert');
+    expect(face('done')).not.toHaveAttribute('aria-hidden');
+    // Only the visible face is in the accessibility tree.
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
+  it('moves focus to the new face’s heading and announces the list', async () => {
+    const task = app.add(T1, 'a')!;
+    app.add(T1, 'b');
+    app.toggleDone(T1, task.id);
+    render(App);
+    await fireEvent.click(flipButton());
+    expect(face('done').querySelector('h1')).toHaveFocus();
+    expect(screen.getByText('Done list, 1 task')).toBeInTheDocument();
+
+    await fireEvent.click(flipButton());
+    expect(face('todo').querySelector('h1')).toHaveFocus();
+    expect(screen.getByText('To do list, 1 task')).toBeInTheDocument();
+  });
+
+  it('flips with the F key, but not while typing or with a modifier', async () => {
+    render(App);
+    await type('hello');
+    await fireEvent.keyDown(field(), { key: 'f' });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+
+    await fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true });
+    await fireEvent.keyDown(document.body, { key: 'f', metaKey: true });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+
+    await fireEvent.keyDown(document.body, { key: 'F' });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'true');
+    await fireEvent.keyDown(document.body, { key: 'f' });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('does not flip with F while a drag, edit or menu holds the page', async () => {
+    render(App);
+    const release = busy.hold();
+    await fireEvent.keyDown(document.body, { key: 'f' });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+    release();
+    await fireEvent.keyDown(document.body, { key: 'f' });
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('holds the page while a task is being edited or its menu is open', async () => {
+    app.add(T1, 'a');
+    render(App);
+    await fireEvent.click(screen.getByRole('button', { name: 'a' }));
+    expect(busy.active).toBe(true);
+    await fireEvent.keyDown(screen.getByLabelText('Edit task'), { key: 'Escape' });
+    expect(busy.active).toBe(false);
+
+    await openMenu('a');
+    expect(busy.active).toBe(true);
+    await fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(busy.active).toBe(false);
+  });
+
+  it('starts each new day on the front', async () => {
+    render(App);
+    await fireEvent.click(flipButton());
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'true');
+    vi.setSystemTime(new Date(2026, 9, 26, 8, 0, 0));
+    app.tick();
+    await tick();
+    expect(flipButton()).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+describe('turning over by itself', () => {
+  const flipButton = () => screen.getByRole('button', { name: /^Show (done|to-do) list$/ });
+  const onBack = () => flipButton().getAttribute('aria-pressed') === 'true';
+  const settle = async () => {
+    vi.advanceTimersByTime(400);
+    await tick();
+  };
+
+  it('turns the page and stamps it when the last open task is checked off', async () => {
+    app.add(T1, 'only one');
+    render(App);
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' }));
+    expect(onBack()).toBe(false); // waits for the check-off animation
+    await settle();
+    expect(onBack()).toBe(true);
+    expect(screen.getByText('All done ✓')).toBeInTheDocument();
+  });
+
+  it('does not turn while other tasks are open', async () => {
+    app.add(T1, 'one');
+    app.add(T1, 'two');
+    render(App);
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'one' }));
+    await settle();
+    expect(onBack()).toBe(false);
+  });
+
+  it('does not turn when the last task is deleted', async () => {
+    app.add(T1, 'only one');
+    render(App);
+    const menu = await openMenu('only one');
+    await fireEvent.click(within(menu).getByRole('button', { name: 'Delete' }));
+    await settle();
+    expect(onBack()).toBe(false);
+    expect(screen.queryByText('All done ✓')).not.toBeInTheDocument();
+  });
+
+  it('does not turn if the task was unchecked again in the meantime', async () => {
+    app.add(T1, 'only one');
+    render(App);
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' }));
+    await fireEvent.click(flipButton()); // look at the back…
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' })); // …take it back…
+    await fireEvent.click(flipButton()); // …and return to the list
+    await settle();
+    expect(onBack()).toBe(false);
+  });
+
+  it('only turns once, however often the list is finished', async () => {
+    app.add(T1, 'only one');
+    render(App);
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' }));
+    await settle();
+    expect(onBack()).toBe(true);
+
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' })); // uncheck on the back
+    await fireEvent.click(flipButton()); // back to the front
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' })); // finish again
+    await settle();
+    expect(onBack()).toBe(false);
+  });
+
+  it('does not turn while something else holds the page', async () => {
+    app.add(T1, 'only one');
+    render(App);
+    const release = busy.hold();
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' }));
+    await settle();
+    expect(onBack()).toBe(false);
+    release();
   });
 });
