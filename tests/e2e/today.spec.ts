@@ -76,7 +76,7 @@ test('a routine comes back on the next day and the old page is read-only', async
   // Midnight passes while the page is open; the change is refused with a notice.
   await page.clock.setSystemTime(new Date('2026-10-26T00:00:10-04:00'));
   await add(page, 'too late');
-  await expect(page.getByText("It's a new day. Yesterday's page is now read-only")).toBeVisible();
+  await expect(page.getByText("It's a new day. That page is now read-only.")).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Monday, October 26');
   await expect(page.getByRole('checkbox', { name: 'Stretch' })).toHaveCount(1);
   await expect(page.getByText('too late')).toHaveCount(0);

@@ -121,8 +121,8 @@ export function sampleFlip(
 export type AutoFlipContext = {
   /** What emptied the list: only checking tasks off turns the page. */
   cause: 'check' | 'delete' | 'copy' | 'other';
-  /** Today's page (past pages are read-only). */
-  editable: boolean;
+  /** Tasks on this page can be checked (today and yesterday). */
+  canCheck: boolean;
   side: Side;
   /** A drag, edit or menu is open. */
   busy: boolean;
@@ -139,7 +139,7 @@ export function shouldAutoFlip(before: number, after: number, context: AutoFlipC
     context.cause === 'check' &&
     before === 1 &&
     after === 0 &&
-    context.editable &&
+    context.canCheck &&
     context.side === 'todo' &&
     !context.busy &&
     !context.alreadyFlipped

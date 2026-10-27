@@ -44,6 +44,22 @@ for (const scheme of ['light', 'dark'] as const) {
       await scan(page, 'a past page');
     });
 
+    test('yesterday (check-off only), front and back, and an older read-only page', async ({
+      page,
+    }) => {
+      await page.getByRole('button', { name: 'Older ›' }).click();
+      await expect(face(page).getByText('Yesterday')).toBeVisible();
+      await expect(face(page).getByRole('checkbox').first()).toBeEnabled();
+      await scan(page, 'yesterday, to do');
+      await page.getByRole('button', { name: 'Show done list' }).click();
+      await expect(face(page).getByRole('heading', { level: 1 })).toBeFocused();
+      await scan(page, 'yesterday, done side');
+      await page.getByRole('button', { name: 'Show to-do list' }).click();
+      await page.getByRole('button', { name: 'Older ›' }).click();
+      await expect(face(page).getByRole('img', { name: 'Read-only' })).toBeVisible();
+      await scan(page, 'an older page');
+    });
+
     test('Stats and Settings', async ({ page }) => {
       await face(page).getByRole('button', { name: 'Stats' }).click();
       await expect(dialog(page, 'Stats')).toBeVisible();

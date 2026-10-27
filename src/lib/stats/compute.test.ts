@@ -363,3 +363,35 @@ describe('skippedBefore', () => {
     expect(skippedBefore(data, ago(5))).toBe(0);
   });
 });
+
+describe('a task on yesterday checked off today', () => {
+  /** Yesterday's page, with its only task done by a timestamp from today. */
+  function lateCheck(): AppData {
+    const data = build({ [ago(2)]: [1, 0], [ago(1)]: [0, 0], [ago(0)]: [0, 1] });
+    data.days[ago(1)]!.tasks.push(
+      mk(ago(1), false, { routineId: 'r1', doneAt: `${TODAY}T09:10:00.000Z` }),
+    );
+    data.routines = [
+      { id: 'r1', text: 'Stretch', active: true, createdAt: '2026-09-01T00:00:00.000Z' },
+    ];
+    return data;
+  }
+
+  it('counts for yesterday’s bar and cell, not today’s', () => {
+    const data = lateCheck();
+    const counts = dailyCounts(data, ago(1), TODAY);
+    expect(counts.map((c) => c.done)).toEqual([1, 0]);
+  });
+
+  it('repairs a streak that otherwise ended the day before yesterday', () => {
+    const before = build({ [ago(2)]: [1, 0], [ago(1)]: [0, 1], [ago(0)]: [0, 1] });
+    expect(streaks(before, TODAY).current).toBe(0);
+    expect(streaks(lateCheck(), TODAY).current).toBe(2);
+  });
+
+  it('raises the routine completion', () => {
+    const data = lateCheck();
+    const r1 = routineStats(data, lastDays(30, TODAY)).find((s) => s.id === 'r1')!;
+    expect([r1.done, r1.instances]).toEqual([1, 1]);
+  });
+});

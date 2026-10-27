@@ -173,13 +173,21 @@ test.describe('buttons, keys and wheel', () => {
     await expect(heading(page)).toHaveText('Saturday, October 24');
     await settled(page);
     await expect(sheet(page, 'current').getByText('· Yesterday').first()).toBeVisible();
-    await expect(page.getByRole('img', { name: 'Read-only' })).toBeVisible();
+    // Yesterday allows checking only: a tick icon instead of the lock, and working checkboxes.
+    await expect(page.getByRole('img', { name: 'Read-only' })).toHaveCount(0);
+    await expect(sheet(page, 'current').getByRole('checkbox').first()).toBeEnabled();
     await expect(sheet(page, 'current').getByLabel('New task')).toHaveCount(0);
     await expect(page.locator('.sheet[data-role="current"] [data-handle]')).toHaveCount(0);
     await page.getByRole('button', { name: 'Copy to today' }).first().click();
     await page.getByRole('button', { name: 'Today', exact: true }).click();
     await expect(heading(page)).toHaveText('Sunday, October 25');
     await expect(scroller(page)).toContainText('Task 2 of 2026-10-24');
+
+    // Older pages are fully read-only, with the lock.
+    await goOlder(page, 'October 24');
+    await goOlder(page, 'October 23');
+    await expect(page.getByRole('img', { name: 'Read-only' })).toBeVisible();
+    await expect(sheet(page, 'current').getByRole('checkbox').first()).toBeDisabled();
   });
 
   test('missed days are skipped, with a note on the page below the gap', async ({ page }) => {

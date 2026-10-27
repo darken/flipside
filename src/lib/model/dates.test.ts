@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDays,
   compareKeys,
+  dayAccess,
   daysBetween,
+  doneDate,
+  formatDoneAt,
   formatHeading,
   formatShort,
   formatWithWeekday,
@@ -273,5 +276,48 @@ describe('short formats', () => {
     expect(formatWithWeekday('2026-10-22', 'en-US')).toBe('Thu, Oct 22');
     expect(weekdayName(1, 'en-US')).toBe('Mon');
     expect(weekdayName(0, 'en-US', 'narrow')).toBe('S');
+  });
+});
+
+describe('dayAccess', () => {
+  it('is full for today, check-only for yesterday and read-only for older days', () => {
+    expect(dayAccess('2026-10-25', '2026-10-25')).toBe('full');
+    expect(dayAccess('2026-10-24', '2026-10-25')).toBe('check-only');
+    expect(dayAccess('2026-10-23', '2026-10-25')).toBe('read-only');
+    expect(dayAccess('2020-01-01', '2026-10-25')).toBe('read-only');
+  });
+
+  it('finds yesterday across month and year boundaries', () => {
+    expect(dayAccess('2026-02-28', '2026-03-01')).toBe('check-only');
+    expect(dayAccess('2025-12-31', '2026-01-01')).toBe('check-only');
+    expect(dayAccess('2024-02-29', '2024-03-01')).toBe('check-only');
+    expect(dayAccess('2025-12-30', '2026-01-01')).toBe('read-only');
+  });
+
+  it('finds yesterday on the night daylight saving starts and ends', () => {
+    expect(dayAccess('2026-03-07', '2026-03-08')).toBe('check-only');
+    expect(dayAccess('2026-03-08', '2026-03-09')).toBe('check-only');
+    expect(dayAccess('2026-10-31', '2026-11-01')).toBe('check-only');
+    expect(dayAccess('2026-11-01', '2026-11-02')).toBe('check-only');
+    expect(dayAccess('2026-11-01', '2026-11-03')).toBe('read-only');
+  });
+});
+
+describe('formatDoneAt', () => {
+  const at = (y: number, m: number, d: number, h: number, min: number) =>
+    new Date(y, m - 1, d, h, min).toISOString();
+
+  it('shows only the time on the page’s own day', () => {
+    expect(formatDoneAt(at(2026, 10, 26, 14, 32), '2026-10-26', 'en-US')).toBe('2:32 PM');
+    expect(doneDate(at(2026, 10, 26, 14, 32), '2026-10-26', 'en-US')).toBeNull();
+  });
+
+  it('adds the date when it was done on another day', () => {
+    expect(formatDoneAt(at(2026, 10, 27, 9, 10), '2026-10-26', 'en-US')).toBe('Oct 27, 9:10 AM');
+  });
+
+  it('treats just after midnight as the next day, and just before as the same', () => {
+    expect(formatDoneAt(at(2026, 10, 27, 0, 1), '2026-10-26', 'en-US')).toBe('Oct 27, 12:01 AM');
+    expect(formatDoneAt(at(2026, 10, 26, 23, 59), '2026-10-26', 'en-US')).toBe('11:59 PM');
   });
 });

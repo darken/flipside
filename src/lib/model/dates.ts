@@ -62,6 +62,15 @@ export function daysBetween(from: DateKey, to: DateKey): number {
   return Math.round((utc(b) - utc(a)) / MS_PER_DAY);
 }
 
+/** What a page allows: everything (today), checking tasks off and on (yesterday), or nothing. */
+export type DayAccess = 'full' | 'check-only' | 'read-only';
+
+/** The calendar day before `today` is check-only; anything older is read-only. */
+export function dayAccess(key: DateKey, today: DateKey): DayAccess {
+  if (!isPast(key, today)) return 'full';
+  return key === addDays(today, -1) ? 'check-only' : 'read-only';
+}
+
 /** True when `key` is a day before `today`. Past days are read-only. */
 export function isPast(key: DateKey, today: DateKey): boolean {
   return compareKeys(key, today) < 0;
@@ -81,6 +90,19 @@ export function formatTime(iso: string, locale?: string): string {
   return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(
     new Date(iso),
   );
+}
+
+/** The date of a completion when it is not on its page's own day (such as "Oct 27"), else null. */
+export function doneDate(doneAt: string, pageKey: DateKey, locale?: string): string | null {
+  const day = todayKey(new Date(doneAt));
+  return day === pageKey ? null : formatShort(day, locale);
+}
+
+/** When a task was done: "14:32" on its page's day, "Oct 27, 09:10" on another. */
+export function formatDoneAt(doneAt: string, pageKey: DateKey, locale?: string): string {
+  const date = doneDate(doneAt, pageKey, locale);
+  const time = formatTime(doneAt, locale);
+  return date ? `${date}, ${time}` : time;
 }
 
 /** How long ago a page is, relative to today: "Yesterday", "3 days ago", "2 weeks ago". */

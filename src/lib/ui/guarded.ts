@@ -1,7 +1,7 @@
 import { ReadOnlyDayError } from '$lib/store/guard';
 import { toasts } from './toast.svelte';
 
-export const NEW_DAY_MESSAGE = "It's a new day. Yesterday's page is now read-only";
+export const NEW_DAY_MESSAGE = "It's a new day. That page is now read-only.";
 
 /**
  * Runs a store change. If the day has just turned read-only (midnight passed while the page was

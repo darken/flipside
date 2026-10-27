@@ -17,10 +17,11 @@
   type Props = {
     key: DateKey;
     editable: boolean;
+    canCheck: boolean;
     /** A task was checked off: how many were open before and after. */
     onCheckedOff?: (before: number, after: number) => void;
   };
-  let { key, editable, onCheckedOff }: Props = $props();
+  let { key, editable, canCheck, onCheckedOff }: Props = $props();
 
   type Drag = { id: string; from: number; to: number; dy: number; height: number };
 
@@ -247,6 +248,7 @@
           {task}
           {key}
           {editable}
+          {canCheck}
           dragging={drag?.id === task.id}
           offsetY={offsetFor(i)}
           animateShift={drag !== null}

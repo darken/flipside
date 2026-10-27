@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import { formatHeading, formatRelative } from '$lib/model/dates';
-  import { daysBetween } from '$lib/model/dates';
+  import { daysBetween, dayAccess } from '$lib/model/dates';
   import type { DateKey } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import { busy } from '$lib/ui/busy.svelte';
@@ -273,7 +273,9 @@
       formatHeading(key),
       key === app.today ? 'Today' : formatRelative(key, app.today),
     ];
-    if (!app.isEditable(key)) parts.push('read-only');
+    const access = dayAccess(key, app.today);
+    if (access === 'check-only') parts.push('check-off only');
+    else if (access === 'read-only') parts.push('read-only');
     const skipped = skippedFor(key);
     announcement = parts.join(' · ') + (skipped > 0 ? `, ${skippedLabel(skipped)}` : '');
     sheetOf(key)
@@ -379,7 +381,7 @@
       if (today === before) return;
       if (currentKey === before) {
         // On today's page: the new day lays down on top, the old one becomes the read-only page below.
-        toasts.show("It's a new day");
+        toasts.show("It's a new day. You can still check off yesterday's tasks.");
         void tick().then(() => step('newer'));
       }
       // On a past page: stay put. Today and Back lead to the new day.

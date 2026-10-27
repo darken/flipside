@@ -284,14 +284,13 @@ describe('read-only past days', () => {
     return { store, routine, plain };
   }
 
-  it('rejects every change to yesterday, even before the minute timer has fired', () => {
+  it('rejects every change except checking on yesterday, even before the minute timer has fired', () => {
     const { store, plain, routine } = afterMidnight();
     const before = JSON.stringify($state.snapshot(store.data.days[T1]));
     const attempts = [
       () => store.add(T1, 'new'),
       () => store.edit(T1, plain.id, 'changed'),
       () => store.remove(T1, plain.id),
-      () => store.toggleDone(T1, plain.id),
       () => store.move(T1, plain.id, 0),
       () => store.setRoutine(T1, routine.id, false),
       () => store.setRoutine(T1, plain.id, true),
@@ -300,6 +299,36 @@ describe('read-only past days', () => {
     expect(JSON.stringify($state.snapshot(store.data.days[T1]))).toBe(before);
     expect(store.data.routines[0]!.active).toBe(true);
     expect(store.today).toBe(T2);
+  });
+
+  it('lets yesterday be checked off and back, with the real time', () => {
+    const { store, plain } = afterMidnight();
+    store.toggleDone(T1, plain.id);
+    const task = store.day(T1)!.tasks.find((t) => t.id === plain.id)!;
+    expect(task.doneAt).toBe(new Date(2026, 9, 26, 0, 0, 5).toISOString());
+    store.toggleDone(T1, plain.id);
+    expect(store.day(T1)!.tasks.find((t) => t.id === plain.id)!.doneAt).toBeUndefined();
+  });
+
+  it('rejects checking the day before yesterday', () => {
+    const { store, plain } = afterMidnight();
+    clock = new Date(2026, 9, 27, 0, 0, 5);
+    expect(() => store.toggleDone(T1, plain.id)).toThrow(ReadOnlyDayError);
+    expect(store.canCheck(T1)).toBe(false);
+  });
+
+  it('moves the levels along at midnight: old today checks only, old yesterday is read-only', () => {
+    const { store } = afterMidnight();
+    store.tick();
+    expect(store.canCheck(T2)).toBe(true);
+    expect(store.isEditable(T1)).toBe(false);
+    expect(store.canCheck(T1)).toBe(true);
+    clock = new Date(2026, 9, 27, 0, 0, 5);
+    store.tick();
+    expect(store.canCheck(T1)).toBe(false);
+    expect(store.canCheck(T2)).toBe(true);
+    expect(store.isEditable(T2)).toBe(false);
+    expect(store.isEditable('2026-10-27')).toBe(true);
   });
 
   it('reports editability by date', () => {

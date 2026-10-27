@@ -134,7 +134,9 @@ describe('turning pages', () => {
   it('announces the new page and moves focus to its heading', async () => {
     await fireEvent.click(older());
     await settle();
-    expect(screen.getByText('Saturday, October 24 · Yesterday · read-only')).toBeInTheDocument();
+    expect(
+      screen.getByText('Saturday, October 24 · Yesterday · check-off only'),
+    ).toBeInTheDocument();
     expect(heading()).toHaveFocus();
   });
 
@@ -156,7 +158,22 @@ describe('past pages', () => {
     await settle();
   });
 
-  it('are read-only: no new-task field, no handles, no menu, disabled checkboxes', () => {
+  it('yesterday allows checking only: no field, handles or menu, working checkboxes, a tick icon', () => {
+    const page = within(current());
+    expect(page.queryByLabelText('New task')).not.toBeInTheDocument();
+    expect(page.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
+    expect(page.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
+    expect(page.getAllByRole('checkbox').every((c) => !(c as HTMLInputElement).disabled)).toBe(
+      true,
+    );
+    expect(page.queryByRole('img', { name: 'Read-only' })).not.toBeInTheDocument();
+    expect(current().querySelector('[data-face]:not([inert]) .caption svg')).toBeInTheDocument();
+    expect(current().querySelector('.page')).toHaveClass('past');
+  });
+
+  it('older pages are read-only: no new-task field, no handles, no menu, disabled checkboxes', async () => {
+    await fireEvent.click(older());
+    await settle();
     const page = within(current());
     expect(page.queryByLabelText('New task')).not.toBeInTheDocument();
     expect(page.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
@@ -272,7 +289,9 @@ describe('a new day while the app is open', () => {
 
   it('on today: lays the new day on top and says so, and yesterday becomes read-only', async () => {
     await midnight();
-    expect(toasts.items.map((t) => t.message)).toContain("It's a new day");
+    expect(toasts.items.map((t) => t.message)).toContain(
+      "It's a new day. You can still check off yesterday's tasks.",
+    );
     expect(heading()).toHaveTextContent('Monday, October 26');
     expect(within(current()).getByLabelText('New task')).toBeInTheDocument();
 
@@ -280,6 +299,12 @@ describe('a new day while the app is open', () => {
     await settle();
     expect(heading()).toHaveTextContent('Sunday, October 25');
     expect(within(current()).queryByLabelText('New task')).not.toBeInTheDocument();
+    // The old today is now yesterday: checking still works.
+    expect(
+      within(current())
+        .getAllByRole('checkbox')
+        .every((c) => !(c as HTMLInputElement).disabled),
+    ).toBe(true);
   });
 
   it('on a past page: stays where you are, and Today leads to the new day', async () => {
@@ -287,7 +312,7 @@ describe('a new day while the app is open', () => {
     await settle();
     await midnight();
     expect(heading()).toHaveTextContent('Saturday, October 24');
-    expect(toasts.items.map((t) => t.message)).not.toContain("It's a new day");
+    expect(toasts.items.map((t) => t.message).join()).not.toContain("It's a new day");
 
     await fireEvent.click(within(current()).getByRole('button', { name: 'Today' }));
     await settle();

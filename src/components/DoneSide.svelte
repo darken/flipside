@@ -8,8 +8,9 @@
   let {
     key,
     editable,
+    canCheck,
     stamp = false,
-  }: { key: DateKey; editable: boolean; stamp?: boolean } = $props();
+  }: { key: DateKey; editable: boolean; canCheck: boolean; stamp?: boolean } = $props();
 
   const done = $derived(doneTasks(app.day(key) ?? { date: key, tasks: [] }));
   const summary = $derived(`${done.length} done${key === app.today ? ' today' : ''}`);
@@ -26,7 +27,7 @@
     <ul class="list">
       {#each done as task (task.id)}
         <li class="slot" transition:taskFade>
-          <TaskItem {task} {key} {editable} />
+          <TaskItem {task} {key} {editable} {canCheck} />
         </li>
       {/each}
     </ul>

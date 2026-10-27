@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { dayAccess } from '$lib/model/dates';
   import { doneTasks, todoTasks } from '$lib/model/tasks';
   import type { DateKey } from '$lib/model/types';
   import { settings } from '$lib/settings/settings.svelte';
@@ -37,7 +38,9 @@
   let root: HTMLDivElement | undefined = $state();
   let autoFlipTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const editable = $derived(app.isEditable(key));
+  const access = $derived(dayAccess(key, app.today));
+  const editable = $derived(access === 'full');
+  const canCheck = $derived(access !== 'read-only');
   const day = $derived(app.day(key) ?? { date: key, tasks: [] });
   const todoCount = $derived(todoTasks(day).length);
   const doneCount = $derived(doneTasks(day).length);
@@ -55,7 +58,7 @@
   function onCheckedOff(before: number, after: number) {
     const context = () => ({
       cause: 'check' as const,
-      editable,
+      canCheck,
       side,
       busy: busy.active,
       alreadyFlipped: autoFlipped,
@@ -96,26 +99,26 @@
       <Face
         {key}
         caption="To do"
-        readOnly={!editable}
+        {access}
         {nav}
         {skipped}
         scrollTop={memory.scroll.todo}
         onScroll={(top) => (memory.scroll.todo = top)}
       >
-        <TodoSide {key} {editable} {onCheckedOff} />
+        <TodoSide {key} {editable} {canCheck} {onCheckedOff} />
       </Face>
     {/snippet}
     {#snippet back()}
       <Face
         {key}
         caption="Done"
-        readOnly={!editable}
+        {access}
         {nav}
         {skipped}
         scrollTop={memory.scroll.done}
         onScroll={(top) => (memory.scroll.done = top)}
       >
-        <DoneSide {key} {editable} stamp={autoFlipped && todoCount === 0} />
+        <DoneSide {key} {editable} {canCheck} stamp={autoFlipped && todoCount === 0} />
       </Face>
     {/snippet}
   </FlipCard>

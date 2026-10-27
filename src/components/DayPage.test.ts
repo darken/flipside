@@ -342,19 +342,20 @@ describe('reordering with the keyboard', () => {
 });
 
 describe('read-only pages', () => {
-  function yesterdayPage() {
+  /** A page from two days ago: the day after it is already read-only. */
+  function olderPage() {
     const oneOff = app.add(T1, 'unfinished one-off')!;
     const routine = app.add(T1, 'Stretch')!;
     app.setRoutine(T1, routine.id, true);
     const finished = app.add(T1, 'finished')!;
     app.toggleDone(T1, finished.id);
-    vi.setSystemTime(new Date(2026, 9, 26, 8, 0, 0));
+    vi.setSystemTime(new Date(2026, 9, 27, 8, 0, 0));
     app.tick();
     return { oneOff, routine, finished };
   }
 
   it('has no edit controls, and Copy to today only on unfinished one-offs', async () => {
-    yesterdayPage();
+    olderPage();
     render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     expect(screen.queryByLabelText('New task')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
@@ -368,7 +369,7 @@ describe('read-only pages', () => {
   });
 
   it('copies an unfinished task to today and leaves the old page alone', async () => {
-    yesterdayPage();
+    olderPage();
     render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     await fireEvent.click(screen.getByRole('button', { name: 'Copy to today' }));
     expect(todoTexts()).toEqual(['Stretch', 'unfinished one-off']);
@@ -376,7 +377,7 @@ describe('read-only pages', () => {
   });
 
   it('shows the done side without uncheck controls', async () => {
-    yesterdayPage();
+    olderPage();
     render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
     await fireEvent.click(screen.getByRole('button', { name: 'Show done list' }));
     expect(screen.getByText('1 done')).toBeInTheDocument();
@@ -576,5 +577,110 @@ describe('turning over by itself', () => {
     await settle();
     expect(onBack()).toBe(false);
     release();
+  });
+});
+
+describe('yesterday: checking off only', () => {
+  const flipButton = () => screen.getByRole('button', { name: /^Show (done|to-do) list$/ });
+  const onBack = () => flipButton().getAttribute('aria-pressed') === 'true';
+
+  /** Two tasks on Sunday the 25th, viewed on Monday the 26th. */
+  function yesterday() {
+    const first = app.add(T1, 'water plants')!;
+    const second = app.add(T1, 'call Sam')!;
+    vi.setSystemTime(new Date(2026, 9, 26, 9, 10, 0));
+    app.tick();
+    return { first, second };
+  }
+  const page = () => document.querySelector('[data-face="todo"] .page')!;
+
+  it('keeps the caption text, swapping the lock for a tick icon', () => {
+    yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    const caption = document.querySelector('[data-face="todo"] .caption')!;
+    expect(caption.textContent).toMatch(/^To do\s*· Yesterday\s*$/);
+    expect(caption.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByRole('img', { name: 'Read-only' })).not.toBeInTheDocument();
+    expect(page()).toHaveClass('past');
+  });
+
+  it('offers checkboxes and Copy to today, and nothing else', () => {
+    yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2);
+    expect(boxes.every((c) => !(c as HTMLInputElement).disabled)).toBe(true);
+    expect(document.querySelector('.item.can-check')).toBeInTheDocument();
+    expect(screen.queryByLabelText('New task')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Copy to today' })).toHaveLength(2);
+  });
+
+  it('tapping the text does nothing: no editing, no notice', async () => {
+    yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    await fireEvent.click(screen.getByText('water plants'));
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(toasts.items).toHaveLength(0);
+  });
+
+  it('checks a task off and back on, moving it between the sides', async () => {
+    const { first } = yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'water plants' }));
+    expect(app.day(T1)!.tasks.find((t) => t.id === first.id)!.doneAt).toBeDefined();
+
+    await fireEvent.click(flipButton());
+    const box = screen.getByRole('checkbox', { name: 'water plants' });
+    expect(box).not.toBeDisabled();
+    // Done the next day: the label carries the date.
+    expect(document.querySelector('time')!.textContent).toMatch(/^Oct 26, /);
+    await fireEvent.click(box);
+    expect(app.day(T1)!.tasks.find((t) => t.id === first.id)!.doneAt).toBeUndefined();
+    expect(doneTasks(app.day(T1)!)).toHaveLength(0);
+  });
+
+  it('shows no date when a task is done on its own day', async () => {
+    const task = app.add(T1, 'early one')!;
+    app.toggleDone(T1, task.id);
+    vi.setSystemTime(new Date(2026, 9, 26, 9, 10, 0));
+    app.tick();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    await fireEvent.click(flipButton());
+    expect(document.querySelector('time')!.textContent).not.toMatch(/Oct/);
+  });
+
+  it('turns the page and stamps it when the last open task is checked off', async () => {
+    app.add(T1, 'only one');
+    vi.setSystemTime(new Date(2026, 9, 26, 9, 10, 0));
+    app.tick();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'only one' }));
+    vi.advanceTimersByTime(400);
+    await tick();
+    expect(onBack()).toBe(true);
+    expect(screen.getByText('All done ✓')).toBeInTheDocument();
+  });
+
+  it('copies an unfinished task to today', async () => {
+    yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    await fireEvent.click(screen.getAllByRole('button', { name: 'Copy to today' })[0]!);
+    expect(app.todayDay.tasks.map((t) => t.text)).toEqual(['water plants']);
+  });
+
+  it('turns read-only when the next midnight passes, and a check then shows a notice', async () => {
+    const { first } = yesterday();
+    render(DayPage, { key: T1, memory: newPageMemory(), nav: noNav });
+    vi.setSystemTime(new Date(2026, 9, 27, 0, 0, 10)); // the minute timer has not fired yet
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'water plants' }));
+    expect(toasts.items.map((t) => t.message)).toContain(NEW_DAY_MESSAGE);
+    expect(app.day(T1)!.tasks.find((t) => t.id === first.id)!.doneAt).toBeUndefined();
+    await tick();
+    expect(screen.getByRole('img', { name: 'Read-only' })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox').every((c) => (c as HTMLInputElement).disabled)).toBe(
+      true,
+    );
   });
 });

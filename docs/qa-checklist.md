@@ -63,11 +63,12 @@ Before the phones, do a pass in the iOS Simulator (layout, safe areas, keyboard,
 - [ ] "Older ›", "‹ Newer" and "Today" in the header work. Today from five days away animates back.
 - [ ] Past pages are read-only and lighter, with "Yesterday"/"N days ago" and "Copy to today" on unfinished tasks. "2 days skipped" shows where days are missing.
 - [ ] **Back** (Android back button or gesture, iOS back swipe in Safari): from a past page goes to today; from Stats or Settings closes the sheet; from today leaves the app. Peeling through many pages needs a single Back.
+- [ ] **Yesterday:** its header shows a ✓ in a circle (not a lock) and the caption reads as before. Check a task off: it fades out and the done side shows it with today's time and the date ("Oct 27, 9:10 AM"); uncheck it on the done side and it comes back. Checking the last open task turns the page ("All done ✓"). There is no new-task field, ⋯ menu or drag handle, and tapping the text does nothing. Go one page older: it shows the lock and the checkboxes are disabled.
 - [ ] On the oldest page the page stretches a little and "This is your first page" shows.
 
 ## 5. New day
 
-- [ ] Leave the app open across midnight (or change the device date and come back to the app): the new day lays down, "It's a new day" toast, yesterday is read-only and routines appear fresh.
+- [ ] Leave the app open across midnight (or change the device date and come back to the app): the new day lays down, "It's a new day. You can still check off yesterday's tasks." toast, the old today allows checking only (✓ icon), the day before it is read-only, and routines appear fresh.
 - [ ] Leave the app in the background for a long time, then return: the day is correct.
 
 ## 6. Stats
@@ -123,7 +124,7 @@ Do this once per platform with VoiceOver (iPhone) and TalkBack (Android). Turn t
 - [ ] Each task reads its text and "checkbox, not checked"; the reorder and actions buttons say which task they belong to.
 - [ ] Adding a task: the field is labelled "New task"; after adding, the new task can be found.
 - [ ] Flipping with "Show done list": afterwards it announces "Done list, N tasks" and focus is on the heading.
-- [ ] Peeling with "Older ›": it announces the new day ("Friday, October 24 · Yesterday · read-only").
+- [ ] Peeling with "Older ›": it announces the new day ("Monday, October 26 · Yesterday · check-off only"; older pages end in "read-only").
 - [ ] Stats: tiles read as label + value; each chart has a spoken summary and a table you can read; the 7/30/90 switch is a radio group.
 - [ ] Settings: every control has a name; the erase steps are readable; the import preview is read.
 - [ ] The toasts are announced ("Task deleted", "Backup downloaded").

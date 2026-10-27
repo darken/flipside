@@ -1,4 +1,4 @@
-import { isPast, todayKey } from '$lib/model/dates';
+import { dayAccess, isPast, todayKey } from '$lib/model/dates';
 import {
   addTask,
   copyToToday,
@@ -14,7 +14,7 @@ import {
 } from '$lib/model/tasks';
 import { emptyData } from '$lib/model/types';
 import type { AppData, DateKey, Day, Task } from '$lib/model/types';
-import { assertEditable } from './guard';
+import { assertCanCheck, assertEditable } from './guard';
 import {
   SAVE_DELAY_MS,
   STORAGE_KEY,
@@ -114,9 +114,14 @@ export class AppStore {
     return this.data.days[key];
   }
 
-  /** Past days are read-only; the UI uses this to hide edit controls. */
+  /** Only today is fully editable; the UI uses this to hide edit controls. */
   isEditable(key: DateKey): boolean {
     return !isPast(key, this.today);
+  }
+
+  /** Today and yesterday can have tasks checked off and on. */
+  canCheck(key: DateKey): boolean {
+    return dayAccess(key, this.today) !== 'read-only';
   }
 
   /** Returns the new task, or null if the text was blank. */
@@ -161,7 +166,7 @@ export class AppStore {
   }
 
   toggleDone(key: DateKey, id: string): void {
-    this.#assertEditable(key);
+    this.#assertCanCheck(key);
     const day = getDay(this.data, key);
     const done = !findTask(day, id).doneAt;
     this.#commit(putDay(this.data, setDone(day, id, done, this.#now())));
@@ -239,6 +244,12 @@ export class AppStore {
     if (this.#askedPersistence) return;
     this.#askedPersistence = true;
     void requestPersistence();
+  }
+
+  /** Like #assertEditable, for checking tasks: yesterday passes too. */
+  #assertCanCheck(key: DateKey): void {
+    this.tick();
+    assertCanCheck(key, this.today);
   }
 
   /** Checks for a date change first, so a page left open past midnight is already read-only. */

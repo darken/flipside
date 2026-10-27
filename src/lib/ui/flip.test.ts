@@ -151,7 +151,7 @@ describe('timing', () => {
 describe('shouldAutoFlip', () => {
   const base: AutoFlipContext = {
     cause: 'check',
-    editable: true,
+    canCheck: true,
     side: 'todo',
     busy: false,
     alreadyFlipped: false,
@@ -179,7 +179,7 @@ describe('shouldAutoFlip', () => {
   });
 
   it('does not turn a past page', () => {
-    expect(shouldAutoFlip(1, 0, { ...base, editable: false })).toBe(false);
+    expect(shouldAutoFlip(1, 0, { ...base, canCheck: false })).toBe(false);
   });
 
   it('does not turn when a drag, edit or menu is open', () => {

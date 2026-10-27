@@ -5,6 +5,11 @@
   box-sizing: border-box;
 }
 
+/* Full ink even where a page switches --ink to its softer past colour */
+:root {
+  --ink-strong: var(--ink);
+}
+
 html {
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;

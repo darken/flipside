@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatTime } from '$lib/model/dates';
+  import { doneDate, formatTime } from '$lib/model/dates';
   import type { DateKey, Task } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import { haptic } from '$lib/ui/haptics';
@@ -12,6 +12,8 @@
     task: Task;
     key: DateKey;
     editable: boolean;
+    /** The checkbox works (today and yesterday). */
+    canCheck: boolean;
     /** Drag state, set by TodoSide while a task is being reordered. */
     dragging?: boolean;
     offsetY?: number;
@@ -28,6 +30,7 @@
     task,
     key,
     editable,
+    canCheck,
     dragging = false,
     offsetY = 0,
     animateShift = false,
@@ -133,6 +136,7 @@
   class="row item"
   class:done
   class:dragging
+  class:can-check={canCheck && !editable}
   class:shifting={animateShift}
   data-task-id={task.id}
   style:transform={offsetY ? `translateY(${offsetY}px)` : undefined}
@@ -141,7 +145,7 @@
     <input
       type="checkbox"
       checked={done}
-      disabled={!editable}
+      disabled={!canCheck}
       aria-label={task.text}
       onchange={toggle}
     />
@@ -186,7 +190,10 @@
 
   <div class="controls">
     {#if done && task.doneAt}
-      <time class="time" datetime={task.doneAt}>{formatTime(task.doneAt)}</time>
+      {@const date = doneDate(task.doneAt, key)}
+      <time class="time" datetime={task.doneAt}
+        >{#if date}<span class="time-date">{`${date}, `}</span>{/if}{formatTime(task.doneAt)}</time
+      >
     {:else}
       {#if routine}
         <span class="badge" role="img" aria-label="Routine">↻</span>
@@ -390,6 +397,13 @@
     font-size: 13px;
     line-height: var(--line-height);
     font-variant-numeric: tabular-nums;
+  }
+  .time-date {
+    font-weight: 300;
+  }
+  /* Yesterday: the text is in past ink, but the boxes still work, so they keep full ink. */
+  .can-check .box {
+    border-color: var(--ink-strong);
   }
   .icon {
     display: grid;

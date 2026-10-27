@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext, type Snippet } from 'svelte';
-  import { formatHeading, formatRelative } from '$lib/model/dates';
+  import { formatHeading, formatRelative, type DayAccess } from '$lib/model/dates';
   import type { DateKey } from '$lib/model/types';
   import { app } from '$lib/store/app.svelte';
   import type { PageNav } from '$lib/ui/page-memory';
@@ -11,7 +11,8 @@
     key: DateKey;
     /** "To do" or "Done" */
     caption: string;
-    readOnly: boolean;
+    /** 'full' (today), 'check-only' (yesterday) or 'read-only': shapes the look of the header. */
+    access: DayAccess;
     nav: PageNav;
     /** Days without a page between this page and the next newer one. */
     skipped: number;
@@ -19,7 +20,7 @@
     onScroll: (top: number) => void;
     children: Snippet;
   };
-  let { key, caption, readOnly, nav, skipped, scrollTop, onScroll, children }: Props = $props();
+  let { key, caption, access, nav, skipped, scrollTop, onScroll, children }: Props = $props();
 
   const openStats = getContext<(() => void) | undefined>(OPEN_STATS);
   const openSettings = getContext<(() => void) | undefined>(OPEN_SETTINGS);
@@ -31,7 +32,7 @@
   }
 </script>
 
-<div class="paper page" class:past={readOnly}>
+<div class="paper page" class:past={access !== 'full'}>
   <header class="bar ruled">
     <div class="line">
       <h1 class="date" tabindex="-1">{formatHeading(key)}</h1>
@@ -56,17 +57,22 @@
     <div class="line">
       <p class="caption">
         {caption}{#if relative}<span class="relative"> · {relative}</span>{/if}
-        {#if readOnly}
+        {#if access === 'read-only'}
           <svg class="lock" viewBox="0 0 24 24" role="img" aria-label="Read-only">
             <rect x="5" y="11" width="14" height="9" rx="2" />
             <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+        {:else if access === 'check-only'}
+          <svg class="lock" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8 12.5l2.7 2.7L16 9.5" />
           </svg>
         {/if}
       </p>
       <nav class="pages" aria-label="Pages">
         <button type="button" disabled={!nav.hasNewer} onclick={nav.onNewer}>‹ Newer</button>
         <button type="button" disabled={!nav.hasOlder} onclick={nav.onOlder}>Older ›</button>
-        {#if readOnly}
+        {#if access !== 'full'}
           <button type="button" class="today" onclick={nav.onToday}>Today</button>
         {/if}
       </nav>
